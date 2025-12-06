@@ -9,9 +9,19 @@ echo "Démarrage du conteneur firewall..."
 mkdir -p /var/lib/rsyslog
 chmod 755 /var/lib/rsyslog
 
+# Créer les fichiers de logs UFW s'ils n'existent pas
+touch /var/log/ufw.log /var/log/kern.log /var/log/messages
+chmod 644 /var/log/ufw.log /var/log/kern.log /var/log/messages
+
 # Démarrer rsyslog en arrière-plan
 echo "Démarrage de rsyslog..."
 rsyslogd
+
+# Attendre que rsyslog soit prêt
+sleep 2
+
+# Tester l'envoi d'un log de test
+logger "Firewall démarré - rsyslog opérationnel"
 
 # Attendre que rsyslog soit prêt
 sleep 2
