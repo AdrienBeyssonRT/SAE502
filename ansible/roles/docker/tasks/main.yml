@@ -28,34 +28,70 @@
   debug:
     msg: "Module docker Python: {{ docker_module_check.stdout if docker_module_check.rc == 0 else 'Non installé' }}"
 
-- name: Installer docker-compose via pip (si pas disponible via apt)
-  pip:
-    name: docker-compose
-    state: present
-    extra_args: "--break-system-packages"
-  when: pip_install_result is succeeded
-  ignore_errors: yes
-
-- name: Vérifier si docker-compose est disponible
-  command: which docker-compose
-  register: docker_compose_which
+- name: Vérifier si docker-compose est déjà disponible
+  command: docker-compose --version
+  register: docker_compose_check
   changed_when: false
   failed_when: false
 
-- name: Installer docker-compose-plugin si docker-compose n'existe pas
+- name: Vérifier si docker compose (plugin) est disponible
+  command: docker compose version
+  register: docker_compose_plugin_check
+  changed_when: false
+  failed_when: false
+
+- name: Afficher le statut actuel de docker-compose
+  debug:
+    msg: "docker-compose déjà installé: {{ docker_compose_check.stdout if docker_compose_check.rc == 0 else 'Non trouvé' }}"
+  when: docker_compose_check.rc == 0
+
+- name: Afficher le statut actuel de docker compose (plugin)
+  debug:
+    msg: "docker compose (plugin) disponible: {{ docker_compose_plugin_check.stdout if docker_compose_plugin_check.rc == 0 else 'Non trouvé' }}"
+  when: docker_compose_plugin_check.rc == 0
+
+- name: Installer docker-compose via apt (seulement si pas déjà installé)
+  apt:
+    name: docker-compose
+    state: present
+  when: docker_compose_check.rc != 0 and docker_compose_plugin_check.rc != 0
+  ignore_errors: yes
+  register: apt_docker_compose_result
+  failed_when: false
+
+- name: Installer docker-compose-plugin via apt (seulement si docker-compose n'existe pas)
   apt:
     name: docker-compose-plugin
     state: present
-  when: docker_compose_which.rc != 0
+  when: docker_compose_check.rc != 0 and docker_compose_plugin_check.rc != 0
   ignore_errors: yes
+  register: apt_docker_compose_plugin_result
+  failed_when: false
 
-- name: Créer un lien symbolique pour docker-compose si nécessaire
+- name: Créer un lien symbolique pour docker-compose si le plugin existe
   file:
     src: /usr/libexec/docker/cli-plugins/docker-compose
     dest: /usr/local/bin/docker-compose
     state: link
-  when: docker_compose_which.rc != 0
+  when: docker_compose_check.rc != 0 and docker_compose_plugin_check.rc == 0
   ignore_errors: yes
+  failed_when: false
+
+- name: Vérifier l'installation finale de docker-compose
+  command: docker-compose --version
+  register: docker_compose_final_check
+  changed_when: false
+  failed_when: false
+
+- name: Vérifier l'installation finale de docker compose (plugin)
+  command: docker compose version
+  register: docker_compose_plugin_final_check
+  changed_when: false
+  failed_when: false
+
+- name: Afficher le statut final de docker-compose
+  debug:
+    msg: "✅ docker-compose: {{ docker_compose_final_check.stdout if docker_compose_final_check.rc == 0 else (docker_compose_plugin_final_check.stdout if docker_compose_plugin_final_check.rc == 0 else '⚠️ Non installé (vous pouvez utiliser: docker compose)') }}"
 
 - name: Obtenir le nom d'utilisateur actuel
   command: whoami

@@ -12,15 +12,25 @@
     path: "{{ docker_compose_file }}"
   register: compose_file_stat
 
+- name: Vérifier quel format docker-compose est disponible
+  command: docker-compose --version
+  register: docker_compose_available
+  changed_when: false
+  failed_when: false
+
+- name: Définir la commande docker-compose à utiliser
+  set_fact:
+    docker_compose_cmd: "{{ 'docker-compose' if docker_compose_available.rc == 0 else 'docker compose' }}"
+
 - name: Arrêter les conteneurs existants (si présents)
-  command: docker-compose -f {{ docker_compose_file }} down
+  command: "{{ docker_compose_cmd }} -f {{ docker_compose_file }} down"
   register: stop_result
   changed_when: false
   failed_when: false
   when: compose_file_stat.stat.exists
 
 - name: Construire et démarrer les conteneurs
-  command: docker-compose -f {{ docker_compose_file }} up -d --build
+  command: "{{ docker_compose_cmd }} -f {{ docker_compose_file }} up -d --build"
   register: compose_up_result
   when: compose_file_stat.stat.exists
 
@@ -29,7 +39,7 @@
     seconds: 10
 
 - name: Vérifier le statut des conteneurs
-  command: docker-compose -f {{ docker_compose_file }} ps
+  command: "{{ docker_compose_cmd }} -f {{ docker_compose_file }} ps"
   register: container_status
   changed_when: false
 
