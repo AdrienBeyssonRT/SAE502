@@ -35,3 +35,4 @@ echo "  docker exec -it client bash"
 echo "  nmap -p 445 firewall"
 echo "  nc -zv firewall 445"
 
+

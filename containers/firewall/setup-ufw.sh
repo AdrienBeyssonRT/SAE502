@@ -22,6 +22,10 @@ ufw default deny routed
 echo "Configuration du logging niveau $LOGGING_LEVEL..."
 ufw logging $LOGGING_LEVEL
 
+# Vérifier que le logging est bien activé
+echo "Vérification du niveau de logging..."
+ufw status verbose | grep -i logging || echo "ATTENTION: Le logging UFW n'est pas activé!"
+
 # Services internes autorisés
 echo "Configuration des services internes..."
 # SSH interne depuis le réseau interne
@@ -62,6 +66,7 @@ echo "Statut UFW:"
 ufw status verbose
 
 echo "Configuration UFW terminée avec succès!"
+
 
 
 

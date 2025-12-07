@@ -9,6 +9,7 @@ RUN apt-get update && \
 
 # Scripts de test
 COPY test_scripts /usr/local/bin/
+COPY generate-traffic.sh /usr/local/bin/generate-traffic.sh
 RUN chmod +x /usr/local/bin/*.sh
 
 WORKDIR /root
@@ -18,6 +19,7 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
+
 
 
 

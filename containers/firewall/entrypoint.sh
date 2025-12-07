@@ -34,9 +34,18 @@ echo "Configuration de UFW..."
 echo "Vérification des logs UFW..."
 tail -5 /var/log/kern.log | grep -i ufw || echo "Aucun log UFW pour le moment"
 
+# Vérifier que rsyslog peut envoyer des logs
+echo "Test d'envoi de log vers logcollector..."
+logger -n logcollector -P 514 -d "Firewall démarré - $(date)"
+
 # Garder le conteneur actif
 echo "Conteneur firewall opérationnel."
-echo "Pour voir les logs en temps réel: docker exec firewall tail -f /var/log/kern.log | grep UFW"
+echo ""
+echo "Pour voir les logs UFW en temps réel:"
+echo "  docker exec firewall tail -f /var/log/kern.log | grep UFW"
+echo ""
+echo "Pour tester la génération de logs:"
+echo "  docker exec client bash /usr/local/bin/generate-traffic.sh"
 sleep infinity
 
 

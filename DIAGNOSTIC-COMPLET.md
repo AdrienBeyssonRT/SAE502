@@ -164,3 +164,4 @@ Après reconstruction, testez dans cet ordre :
 3. Vérifier que les logs sont parsés dans la supervision
 4. Générer du trafic depuis l'extérieur pour voir des logs BLOCK
 
+
