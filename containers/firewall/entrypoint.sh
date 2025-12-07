@@ -30,9 +30,14 @@ sleep 2
 echo "Configuration de UFW..."
 /usr/local/bin/setup-ufw.sh
 
-# Garder le conteneur actif et afficher les logs
-echo "Conteneur firewall opérationnel. Logs UFW:"
-tail -f /var/log/ufw.log /var/log/syslog 2>/dev/null || sleep infinity
+# Vérifier que les logs sont bien générés
+echo "Vérification des logs UFW..."
+tail -5 /var/log/kern.log | grep -i ufw || echo "Aucun log UFW pour le moment"
+
+# Garder le conteneur actif
+echo "Conteneur firewall opérationnel."
+echo "Pour voir les logs en temps réel: docker exec firewall tail -f /var/log/kern.log | grep UFW"
+sleep infinity
 
 
 

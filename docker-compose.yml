@@ -65,6 +65,19 @@ services:
     stdin_open: true
     restart: unless-stopped
 
+  # Conteneur externe pour générer du trafic bloqué
+  attacker:
+    build:
+      context: ./containers/client
+      dockerfile: Dockerfile
+    container_name: attacker
+    hostname: attacker
+    networks:
+      - tests_network
+    tty: true
+    stdin_open: true
+    restart: unless-stopped
+
 networks:
   firewall_network:
     driver: bridge

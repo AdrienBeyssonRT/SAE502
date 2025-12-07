@@ -22,11 +22,17 @@ def parse_log_line(line):
     if not line.strip():
         return None
     
+    # Ignorer les logs rsyslog internes
+    if any(keyword in line for keyword in ['rsyslogd:', 'imjournal:', 'imuxsock:', 'environment variable', 'TZ is not set']):
+        return None
+    
     # Accepter toutes les lignes qui contiennent des informations réseau
-    # Pas seulement UFW, mais aussi les logs kernel qui peuvent contenir des infos réseau
-    has_network_info = any(keyword in line.upper() for keyword in [
+    # Les logs kernel peuvent contenir des infos réseau même sans "UFW"
+    line_upper = line.upper()
+    has_network_info = any(keyword in line_upper for keyword in [
         'UFW', 'SRC=', 'DST=', 'DPT=', 'SPT=', 'PROTO=', 'BLOCK', 'ALLOW', 
-        'IN=', 'OUT=', 'TCP', 'UDP', 'ICMP'
+        'IN=', 'OUT=', 'TCP', 'UDP', 'ICMP', 'SYN', 'ACK', 'FIN', 'RST',
+        'LEN=', 'TTL=', 'ID=', 'WINDOW=', 'MAC=', 'FROM', 'TO', 'PORT'
     ])
     
     if not has_network_info:
@@ -45,43 +51,67 @@ def parse_log_line(line):
     }
     
     # Extraire l'action UFW (plusieurs formats possibles)
-    if '[UFW BLOCK]' in line or 'UFW BLOCK' in line:
-        log_entry['action'] = 'BLOCK'
-    elif '[UFW ALLOW]' in line or 'UFW ALLOW' in line:
-        log_entry['action'] = 'ALLOW'
-    elif '[UFW LIMIT]' in line or 'UFW LIMIT' in line:
-        log_entry['action'] = 'LIMIT'
-    elif 'UFW' in line:
-        # Si UFW est présent mais pas d'action claire, essayer de deviner
-        if 'BLOCK' in line.upper():
-            log_entry['action'] = 'BLOCK'
-        elif 'ALLOW' in line.upper():
-            log_entry['action'] = 'ALLOW'
-        else:
-            log_entry['action'] = 'UNKNOWN'
+    line_upper = line.upper()
     
-    # Extraire IP source
-    src_match = re.search(r'SRC=(\d+\.\d+\.\d+\.\d+)', line)
+    # Détecter les actions UFW explicites
+    if '[UFW BLOCK]' in line or 'UFW BLOCK' in line_upper:
+        log_entry['action'] = 'BLOCK'
+    elif '[UFW ALLOW]' in line or 'UFW ALLOW' in line_upper:
+        log_entry['action'] = 'ALLOW'
+    elif '[UFW LIMIT]' in line or 'UFW LIMIT' in line_upper:
+        log_entry['action'] = 'LIMIT'
+    # Si pas d'action UFW explicite mais présence de mots-clés réseau, essayer de deviner
+    elif 'SRC=' in line and 'DST=' in line:
+        # C'est probablement un log réseau, essayer de déterminer l'action
+        if 'BLOCK' in line_upper or 'DENY' in line_upper:
+            log_entry['action'] = 'BLOCK'
+        elif 'ALLOW' in line_upper or 'ACCEPT' in line_upper:
+            log_entry['action'] = 'ALLOW'
+        elif 'LIMIT' in line_upper:
+            log_entry['action'] = 'LIMIT'
+        else:
+            # Log réseau sans action claire - probablement un log kernel
+            log_entry['action'] = 'NETWORK'
+    
+    # Extraire IP source (plusieurs formats possibles)
+    src_match = re.search(r'SRC[=:](\d+\.\d+\.\d+\.\d+)', line)
+    if not src_match:
+        # Essayer autre format
+        src_match = re.search(r'from\s+(\d+\.\d+\.\d+\.\d+)', line, re.IGNORECASE)
     if src_match:
         log_entry['src_ip'] = src_match.group(1)
     
-    # Extraire IP destination
-    dst_match = re.search(r'DST=(\d+\.\d+\.\d+\.\d+)', line)
+    # Extraire IP destination (plusieurs formats possibles)
+    dst_match = re.search(r'DST[=:](\d+\.\d+\.\d+\.\d+)', line)
+    if not dst_match:
+        # Essayer autre format
+        dst_match = re.search(r'to\s+(\d+\.\d+\.\d+\.\d+)', line, re.IGNORECASE)
     if dst_match:
         log_entry['dst_ip'] = dst_match.group(1)
     
     # Extraire protocole
-    proto_match = re.search(r'PROTO=(\w+)', line)
-    if proto_match:
+    proto_match = re.search(r'PROTO[=:](\w+)', line)
+    if not proto_match:
+        # Essayer de détecter dans la ligne
+        if 'TCP' in line_upper and 'PROTO' not in line_upper:
+            log_entry['protocol'] = 'TCP'
+        elif 'UDP' in line_upper and 'PROTO' not in line_upper:
+            log_entry['protocol'] = 'UDP'
+        elif 'ICMP' in line_upper:
+            log_entry['protocol'] = 'ICMP'
+    elif proto_match:
         log_entry['protocol'] = proto_match.group(1)
     
     # Extraire port source
-    sport_match = re.search(r'SPT=(\d+)', line)
+    sport_match = re.search(r'SPT[=:](\d+)', line)
     if sport_match:
         log_entry['sport'] = sport_match.group(1)
     
-    # Extraire port destination
-    dport_match = re.search(r'DPT=(\d+)', line)
+    # Extraire port destination (plusieurs formats)
+    dport_match = re.search(r'DPT[=:](\d+)', line)
+    if not dport_match:
+        # Essayer autre format
+        dport_match = re.search(r'port\s+(\d+)', line, re.IGNORECASE)
     if dport_match:
         log_entry['dport'] = dport_match.group(1)
     
@@ -96,19 +126,66 @@ def parse_log_line(line):
         except:
             pass
     
-    # Si on a au moins une action, une IP, un port ou un protocole, c'est un log valide
-    if log_entry['action'] or log_entry['src_ip'] or log_entry['dport'] or log_entry['protocol']:
+    # Si on a au moins une IP source ou un port destination, c'est un log réseau valide
+    if log_entry['src_ip'] or log_entry['dport']:
+        # Si pas d'action détectée mais qu'on a des infos réseau, marquer comme NETWORK
+        if not log_entry['action']:
+            log_entry['action'] = 'NETWORK'
         return log_entry
     
-    # Si la ligne contient des informations réseau mais n'a pas été parsée, créer un log basique
-    # Vérifier à nouveau has_network_info
-    has_network_info_check = any(keyword in line.upper() for keyword in [
-        'UFW', 'SRC=', 'DST=', 'DPT=', 'SPT=', 'PROTO=', 'BLOCK', 'ALLOW', 
-        'IN=', 'OUT=', 'TCP', 'UDP', 'ICMP'
-    ])
-    if has_network_info_check:
-        log_entry['action'] = 'UNKNOWN'
-        log_entry['raw'] = line[:200]  # Limiter la taille
+    # Si on a un protocole et une action, c'est aussi valide
+    if log_entry['protocol'] and log_entry['action']:
+        return log_entry
+    
+    # Si on a au moins SRC= ou DST= dans la ligne, c'est un log réseau (même si pas parsé)
+    if 'SRC=' in line or 'DST=' in line or 'SRC:' in line or 'DST:' in line:
+        if not log_entry['action']:
+            log_entry['action'] = 'NETWORK'
+        # Essayer d'extraire au moins l'IP source avec des regex très permissives
+        if not log_entry['src_ip']:
+            # Essayer plusieurs patterns
+            for pattern in [
+                r'SRC[=:](\d+\.\d+\.\d+\.\d+)',
+                r'FROM\s+(\d+\.\d+\.\d+\.\d+)',
+                r'(\d+\.\d+\.\d+\.\d+).*SRC',
+                r'SRC.*?(\d+\.\d+\.\d+\.\d+)'
+            ]:
+                src_alt = re.search(pattern, line, re.IGNORECASE)
+                if src_alt:
+                    log_entry['src_ip'] = src_alt.group(1)
+                    break
+        if not log_entry['dst_ip']:
+            for pattern in [
+                r'DST[=:](\d+\.\d+\.\d+\.\d+)',
+                r'TO\s+(\d+\.\d+\.\d+\.\d+)',
+                r'(\d+\.\d+\.\d+\.\d+).*DST',
+                r'DST.*?(\d+\.\d+\.\d+\.\d+)'
+            ]:
+                dst_alt = re.search(pattern, line, re.IGNORECASE)
+                if dst_alt:
+                    log_entry['dst_ip'] = dst_alt.group(1)
+                    break
+        if not log_entry['dport']:
+            for pattern in [
+                r'DPT[=:](\d+)',
+                r'PORT\s+(\d+)',
+                r'\.(\d+)\s+.*DPT',
+                r'DPT.*?(\d+)'
+            ]:
+                dport_alt = re.search(pattern, line, re.IGNORECASE)
+                if dport_alt:
+                    log_entry['dport'] = dport_alt.group(1)
+                    break
+        if log_entry['src_ip'] or log_entry['dport'] or log_entry['dst_ip']:
+            return log_entry
+    
+    # Dernière tentative : si la ligne contient une IP et des mots-clés réseau, créer un log basique
+    ip_match = re.search(r'(\d+\.\d+\.\d+\.\d+)', line)
+    if ip_match and has_network_info:
+        if not log_entry['action']:
+            log_entry['action'] = 'NETWORK'
+        if not log_entry['src_ip']:
+            log_entry['src_ip'] = ip_match.group(1)
         return log_entry
     
     return None
@@ -145,13 +222,16 @@ def get_recent_logs(limit=1000):
             with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
                 lines = f.readlines()
                 print(f"Lecture de {log_file}: {len(lines)} lignes")
+                parsed_count = 0
                 for line in lines:
                     # Ignorer les logs rsyslog internes
-                    if any(keyword in line for keyword in ['rsyslogd:', 'imjournal:', 'imuxsock:', 'environment variable']):
+                    if any(keyword in line for keyword in ['rsyslogd:', 'imjournal:', 'imuxsock:', 'environment variable', 'TZ is not set']):
                         continue
                     parsed = parse_log_line(line)
                     if parsed:
                         logs.append(parsed)
+                        parsed_count += 1
+                print(f"  -> {parsed_count} logs parsés depuis {os.path.basename(log_file)}")
         except Exception as e:
             print(f"Erreur lecture {log_file}: {e}")
     
@@ -181,6 +261,10 @@ def get_statistics():
                 stats['blocked_attempts'] += 1
             elif log['action'] == 'ALLOW':
                 stats['allowed_connections'] += 1
+            # Les logs NETWORK avec IP source sont probablement des événements bloqués
+            elif log['action'] == 'NETWORK' and log.get('src_ip'):
+                # Compter comme bloqué si on a une IP source (probablement un trafic entrant)
+                stats['blocked_attempts'] += 1
         
         if log.get('src_ip'):
             stats['by_src_ip'][log['src_ip']] += 1
@@ -235,7 +319,10 @@ def api_debug():
         'log_dir_exists': os.path.exists(LOG_DIR),
         'log_dir': LOG_DIR,
         'log_files': [],
-        'sample_logs': []
+        'sample_logs': [],
+        'parsed_samples': [],
+        'total_lines': 0,
+        'parsed_count': 0
     }
     
     if os.path.exists(LOG_DIR):
@@ -246,7 +333,19 @@ def api_debug():
         if log_files:
             try:
                 with open(log_files[0], 'r', encoding='utf-8', errors='ignore') as f:
-                    debug_info['sample_logs'] = f.readlines()[:5]
+                    lines = f.readlines()
+                    debug_info['total_lines'] = len(lines)
+                    debug_info['sample_logs'] = lines[:10]
+                    
+                    # Essayer de parser les échantillons
+                    parsed_count = 0
+                    for line in lines[:50]:
+                        parsed = parse_log_line(line)
+                        if parsed:
+                            parsed_count += 1
+                            if len(debug_info['parsed_samples']) < 5:
+                                debug_info['parsed_samples'].append(parsed)
+                    debug_info['parsed_count'] = parsed_count
             except Exception as e:
                 debug_info['error'] = str(e)
     
