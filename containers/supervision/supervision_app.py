@@ -22,20 +22,30 @@ def parse_log_line(line):
     if not line.strip():
         return None
     
-    # Ignorer les logs rsyslog internes
-    if any(keyword in line for keyword in ['rsyslogd:', 'imjournal:', 'imuxsock:', 'environment variable', 'TZ is not set']):
+    # Ignorer les logs rsyslog internes et les logs de bridge Docker
+    if any(keyword in line for keyword in [
+        'rsyslogd:', 'imjournal:', 'imuxsock:', 'environment variable', 'TZ is not set',
+        'entered blocking state', 'entered disabled state', 'entered forwarding state',
+        'br-', 'veth', 'port 2(', 'port 3(', 'port 4('
+    ]):
         return None
+    
+    # PRIORITÉ : Chercher spécifiquement les logs UFW
+    # Les logs UFW contiennent toujours "[UFW" ou "UFW BLOCK" ou "UFW ALLOW"
+    has_ufw = 'UFW' in line_upper and ('BLOCK' in line_upper or 'ALLOW' in line_upper or 'LIMIT' in line_upper or '[' in line)
     
     # Accepter toutes les lignes qui contiennent des informations réseau
     # Les logs kernel peuvent contenir des infos réseau même sans "UFW"
-    line_upper = line.upper()
     has_network_info = any(keyword in line_upper for keyword in [
-        'UFW', 'SRC=', 'DST=', 'DPT=', 'SPT=', 'PROTO=', 'BLOCK', 'ALLOW', 
+        'SRC=', 'DST=', 'DPT=', 'SPT=', 'PROTO=', 'BLOCK', 'ALLOW', 
         'IN=', 'OUT=', 'TCP', 'UDP', 'ICMP', 'SYN', 'ACK', 'FIN', 'RST',
-        'LEN=', 'TTL=', 'ID=', 'WINDOW=', 'MAC=', 'FROM', 'TO', 'PORT'
+        'LEN=', 'TTL=', 'ID=', 'WINDOW=', 'MAC='
     ])
     
-    if not has_network_info:
+    # Si c'est un log UFW, toujours l'accepter
+    if has_ufw:
+        pass  # Continuer le parsing
+    elif not has_network_info:
         return None
     
     # Format typique: Dec  6 18:30:15 firewall kernel: [UFW BLOCK] IN=eth0 OUT= MAC=... SRC=192.168.1.100 DST=192.168.1.1 LEN=60 TOS=0x00 PREC=0x00 TTL=64 ID=12345 DF PROTO=TCP SPT=12345 DPT=22 WINDOW=29200 RES=0x00 SYN URGP=0
