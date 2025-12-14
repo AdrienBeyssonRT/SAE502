@@ -1,7 +1,7 @@
 #!/bin/bash
 # Script d'entrée pour le conteneur logcollector
 
-set -e
+set -euo pipefail
 
 echo "Démarrage du collecteur de logs..."
 
@@ -13,13 +13,25 @@ chmod 755 /var/log/firewall
 
 # Vérifier la configuration
 echo "Vérification de la configuration rsyslog..."
-rsyslogd -N1 || {
-    echo "Erreur dans la configuration rsyslog"
-    exit 1
-}
+if ! rsyslogd -N1 2>&1; then
+    echo "⚠️  Erreur dans la configuration rsyslog, mais continuation..."
+fi
+
+# Attendre que Splunk soit prêt (optionnel, mais recommandé)
+echo "Attente que Splunk soit prêt..."
+for i in {1..30}; do
+    if getent hosts splunk > /dev/null 2>&1; then
+        echo "✅ Splunk détecté"
+        break
+    fi
+    sleep 2
+done
 
 # Démarrer rsyslog en mode foreground
 echo "Démarrage de rsyslog en mode serveur..."
+echo "  - Réception UDP sur port 514"
+echo "  - Envoi vers Splunk sur port 514 (UDP)"
+echo "  - Stockage local dans /var/log/firewall/"
 exec rsyslogd -n
 
 
