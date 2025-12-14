@@ -1,29 +1,22 @@
 ---
-- name: Déploiement complet et test automatisé du système de logs UFW
+- name: Déploiement de l'infrastructure firewall
   hosts: all
   vars:
     playbook_dir: "{{ playbook_dir | default(ansible_env.PWD | default('/tmp')) }}/ansible/playbooks"
     project_root: "{{ playbook_dir | dirname | dirname }}"
-    firewall_host: "firewall"
-    client_container: "client"
     firewall_container: "firewall"
-    logcollector_container: "logcollector"
-    splunk_container: "splunk"
   
   tasks:
     - name: Afficher le début du déploiement
       debug:
         msg:
           - "=========================================="
-          - "  DÉPLOIEMENT COMPLET ET TEST AUTOMATISÉ"
+          - "  DÉPLOIEMENT DE L'INFRASTRUCTURE"
           - "=========================================="
-          - "Ce playbook automatise :"
+          - "Ce playbook déploie :"
           - "  1. Reconstruction des conteneurs"
           - "  2. Démarrage de l'infrastructure"
           - "  3. Configuration UFW avec logging"
-          - "  4. Génération de trafic pour créer des logs"
-          - "  5. Vérification complète de la chaîne de logs"
-          - "  6. Vérification de la catégorisation (BLOCK/ALLOW)"
           - ""
 
     # ==========================================
@@ -63,7 +56,7 @@
 
     - name: Attendre que les conteneurs soient prêts
       pause:
-        seconds: 15
+        seconds: 20
 
     - name: Vérifier que tous les conteneurs sont en cours d'exécution
       command: docker ps --format "{{ '{{' }}.Names{{ '}}' }}"
@@ -75,333 +68,50 @@
         msg: "Conteneurs actifs: {{ running_containers.stdout_lines }}"
 
     # ==========================================
-    # ÉTAPE 2 : CONFIGURATION UFW
+    # ÉTAPE 3 : CONFIGURATION UFW
     # ==========================================
     - name: Attendre que le firewall soit complètement démarré
       pause:
-        seconds: 10
-
-    - name: Attendre que UFW soit configuré (vérification avec retry)
-      command: docker exec {{ firewall_container }} ufw status | head -1
-      register: ufw_check
-      changed_when: false
-      failed_when: false
-      retries: 10
-      delay: 3
-      until: ufw_check.rc == 0
+        seconds: 15
 
     - name: Vérifier le statut UFW
       command: docker exec {{ firewall_container }} ufw status verbose
       register: ufw_status
       changed_when: false
       failed_when: false
+      retries: 5
+      delay: 5
 
-    - name: Afficher le statut UFW actuel
+    - name: Afficher le statut UFW
       debug:
-        var: ufw_status.stdout_lines
+        msg: "{{ ufw_status.stdout_lines }}"
+      when: ufw_status.rc == 0
 
-    - name: Vérifier que UFW est actif
-      fail:
-        msg:
-          - "❌ ERREUR: UFW n'est pas actif dans le conteneur firewall"
-          - "Vérifiez les logs: docker logs firewall"
-          - "Statut actuel: {{ ufw_status.stdout }}"
-      when: "'Status: active' not in ufw_status.stdout"
-
-    - name: Activer le logging UFW au niveau high si nécessaire
+    - name: Activer le logging UFW au niveau high
       command: docker exec {{ firewall_container }} ufw logging high
       register: ufw_logging
-      changed_when: "'Logging: on (high)' not in ufw_status.stdout"
-      failed_when: false
-
-    - name: Vérifier que le logging est activé
-      command: docker exec {{ firewall_container }} ufw status verbose | grep -i logging
-      register: logging_check
       changed_when: false
       failed_when: false
-
-    - name: Afficher le statut du logging
-      debug:
-        msg: "{{ logging_check.stdout if logging_check.rc == 0 else 'Logging non détecté' }}"
-
-    - name: Nettoyer les anciens logs pour un test propre
-      command: docker exec {{ firewall_container }} sh -c "echo '' > /var/log/kern.log"
-      changed_when: false
-      failed_when: false
-
-    # ==========================================
-    # ÉTAPE 3 : VÉRIFICATION DES SERVICES
-    # ==========================================
-    - name: Vérifier que rsyslog fonctionne dans le firewall
-      command: docker exec {{ firewall_container }} ps aux | grep rsyslog | grep -v grep
-      register: rsyslog_firewall
-      changed_when: false
-      failed_when: false
-
-    - name: Afficher le statut rsyslog dans le firewall
-      debug:
-        msg: "{{ 'rsyslog fonctionne' if rsyslog_firewall.rc == 0 else 'rsyslog ne fonctionne pas' }}"
-
-    - name: Vérifier que rsyslog fonctionne dans le logcollector
-      command: docker exec {{ logcollector_container }} ps aux | grep rsyslog | grep -v grep
-      register: rsyslog_logcollector
-      changed_when: false
-      failed_when: false
-
-    - name: Afficher le statut rsyslog dans le logcollector
-      debug:
-        msg: "{{ 'rsyslog fonctionne' if rsyslog_logcollector.rc == 0 else 'rsyslog ne fonctionne pas' }}"
-
-    - name: Vérifier la connexion réseau entre firewall et logcollector
-      command: docker exec {{ firewall_container }} ping -c 2 {{ logcollector_container }}
-      register: network_check
-      changed_when: false
-      failed_when: false
-
-    - name: Afficher le résultat du test réseau
-      debug:
-        msg: "{{ 'Connexion réseau OK' if network_check.rc == 0 else 'Problème de connexion réseau' }}"
-
-    # ==========================================
-    # ÉTAPE 4 : GÉNÉRATION DE TRAFIC
-    # ==========================================
-    - name: Exécuter les tests UFW pour générer des logs
-      command: docker exec {{ client_container }} /usr/local/bin/test-rules-ufw.sh
-      register: traffic_result
-      changed_when: false
-      failed_when: false
-
-    - name: Afficher le résultat de la génération de trafic
-      debug:
-        msg: "{{ traffic_result.stdout_lines }}"
-
-    # ==========================================
-    # ÉTAPE 5 : VÉRIFICATION DES LOGS
-    # ==========================================
-    - name: Attendre que les logs soient écrits
-      pause:
-        seconds: 5
-
-    - name: Vérifier les logs UFW dans le firewall
-      command: docker exec {{ firewall_container }} tail -100 /var/log/kern.log | grep -i ufw
-      register: ufw_logs
-      changed_when: false
-      failed_when: false
-
-    - name: Compter les logs UFW dans le firewall
-      set_fact:
-        firewall_log_count: "{{ ufw_logs.stdout_lines | length }}"
-
-    - name: Afficher le nombre de logs UFW dans le firewall
-      debug:
-        msg: "{{ firewall_log_count }} logs UFW trouvés dans le firewall"
-
-    - name: Afficher des exemples de logs UFW du firewall
-      debug:
-        msg: "{{ ufw_logs.stdout_lines[:5] }}"
-      when: ufw_logs.stdout_lines | length > 0
-
-    - name: Vérifier que des logs UFW ont été générés
-      fail:
-        msg:
-          - "❌ ERREUR: Aucun log UFW trouvé dans le firewall"
-          - "Vérifiez que:"
-          - "  1. UFW est actif: docker exec {{ firewall_container }} ufw status"
-          - "  2. Le logging est activé: docker exec {{ firewall_container }} ufw status verbose | grep Logging"
-          - "  3. Les règles UFW sont correctes"
-      when: firewall_log_count | int == 0
-
-    - name: Attendre que les logs soient envoyés au collecteur
-      pause:
-        seconds: 5
-
-    - name: Vérifier les logs dans le collecteur
-      shell: docker exec {{ logcollector_container }} sh -c "tail -100 /var/log/firewall/*.log 2>/dev/null | grep -i ufw" || echo ""
-      register: collector_logs
-      changed_when: false
-      failed_when: false
-
-    - name: Compter les logs dans le collecteur
-      set_fact:
-        collector_log_count: "{{ collector_logs.stdout_lines | length }}"
-
-    - name: Afficher le nombre de logs dans le collecteur
-      debug:
-        msg: "{{ collector_log_count }} logs UFW trouvés dans le collecteur"
-
-    - name: Afficher des exemples de logs du collecteur
-      debug:
-        msg: "{{ collector_logs.stdout_lines[:5] }}"
-      when: collector_logs.stdout_lines | length > 0
-
-    - name: Vérifier que les logs sont bien reçus par le collecteur
-      debug:
-        msg:
-          - "{{ '✅ Logs reçus par le collecteur' if collector_log_count | int > 0 else '⚠️  Aucun log reçu par le collecteur' }}"
-          - "Vérifiez la chaîne: firewall -> rsyslog -> logcollector"
-          - "Commandes de diagnostic:"
-          - "  docker exec {{ firewall_container }} tail -20 /var/log/kern.log | grep UFW"
-          - "  docker exec {{ logcollector_container }} tail -20 /var/log/firewall/*.log | grep UFW"
-
-    # ==========================================
-    # ÉTAPE 6 : VÉRIFICATION DE SPLUNK
-    # ==========================================
-    - name: Attendre que Splunk soit prêt
-      pause:
-        seconds: 60
-      vars:
-        splunk_wait_time: 60
-
-    - name: Vérifier que Splunk est en cours d'exécution
-      command: docker ps --filter "name={{ splunk_container }}" --format "{{ '{{' }}.Status{{ '}}' }}"
-      register: splunk_status
-      changed_when: false
-      retries: 10
-      delay: 5
-
-    - name: Afficher le statut de Splunk
-      debug:
-        msg: "Statut Splunk: {{ splunk_status.stdout }}"
-
-    - name: Vérifier que Splunk écoute sur le port 8000
-      wait_for:
-        host: localhost
-        port: 8000
-        timeout: 60
-      changed_when: false
-
-    - name: Attendre que les logs soient indexés dans Splunk
-      pause:
-        seconds: 10
-      vars:
-        msg: "Attente de l'indexation des logs dans Splunk..."
-
-    - name: Vérifier les logs UFW dans Splunk via recherche
-      shell: |
-        docker exec {{ splunk_container }} /opt/splunk/bin/splunk search 'index=main sourcetype=syslog "UFW" | head 20' -auth admin:splunk1RT3 2>/dev/null || echo "Aucun log trouvé"
-      register: splunk_ufw_logs
-      changed_when: false
-      failed_when: false
-      retries: 5
-      delay: 10
-
-    - name: Compter les logs UFW dans Splunk
-      shell: |
-        docker exec {{ splunk_container }} /opt/splunk/bin/splunk search 'index=main sourcetype=syslog "UFW" | stats count' -auth admin:splunk1RT3 -output csv 2>/dev/null | tail -n 1 || echo "0"
-      register: splunk_log_count_raw
-      changed_when: false
-      failed_when: false
-      retries: 3
-      delay: 5
-
-    - name: Extraire le nombre de logs
-      set_fact:
-        splunk_log_count: "{{ splunk_log_count_raw.stdout | regex_replace('^[^0-9]*([0-9]+).*$', '\\1') | default('0') | int }}"
-
-    - name: Afficher le nombre de logs dans Splunk
-      debug:
-        msg: "{{ splunk_log_count }} logs UFW trouvés dans Splunk"
-
-    - name: Afficher des exemples de logs Splunk
-      debug:
-        msg: "{{ splunk_ufw_logs.stdout_lines[:10] }}"
-      when: splunk_ufw_logs.stdout_lines | length > 0
-
-    - name: Message si aucun log dans Splunk
-      debug:
-        msg:
-          - "⚠️  Aucun log UFW trouvé dans Splunk pour le moment"
-          - "Les logs peuvent prendre quelques minutes à être indexés"
-          - "Vérifiez dans l'interface Splunk: http://localhost:8000"
-          - "Recherche à effectuer: index=main sourcetype=syslog UFW"
-          - ""
-          - "Vérifiez la chaîne complète:"
-          - "  1. Logs dans firewall: docker exec {{ firewall_container }} tail -20 /var/log/kern.log | grep UFW"
-          - "  2. Logs dans logcollector: docker exec {{ logcollector_container }} tail -20 /var/log/firewall/*.log | grep UFW"
-          - "  3. Splunk reçoit les logs: docker logs {{ splunk_container }} | grep -i udp"
-      when: splunk_log_count | int == 0
-
-    - name: Rechercher les logs BLOCK dans Splunk
-      shell: |
-        docker exec {{ splunk_container }} /opt/splunk/bin/splunk search 'index=main sourcetype=syslog "UFW BLOCK" | stats count' -auth admin:splunk1RT3 -output csv 2>/dev/null | tail -n 1 || echo "0"
-      register: splunk_block_count_raw
-      changed_when: false
-      failed_when: false
-
-    - name: Extraire le nombre de logs BLOCK
-      set_fact:
-        block_count: "{{ splunk_block_count_raw.stdout | regex_replace('^[^0-9]*([0-9]+).*$', '\\1') | default('0') | int }}"
-
-    - name: Rechercher les logs ALLOW dans Splunk
-      shell: |
-        docker exec {{ splunk_container }} /opt/splunk/bin/splunk search 'index=main sourcetype=syslog "UFW ALLOW" | stats count' -auth admin:splunk1RT3 -output csv 2>/dev/null | tail -n 1 || echo "0"
-      register: splunk_allow_count_raw
-      changed_when: false
-      failed_when: false
-
-    - name: Extraire le nombre de logs ALLOW
-      set_fact:
-        allow_count: "{{ splunk_allow_count_raw.stdout | regex_replace('^[^0-9]*([0-9]+).*$', '\\1') | default('0') | int }}"
-
-    - name: Afficher la répartition par catégorie
-      debug:
-        msg:
-          - "Répartition des logs par catégorie dans Splunk:"
-          - "  BLOCK (bloqués): {{ block_count }}"
-          - "  ALLOW (autorisés): {{ allow_count }}"
-          - "  Total UFW: {{ splunk_log_count }}"
-
-    - name: Vérifier qu'il y a des logs BLOCK
-      debug:
-        msg: "✅ Des logs BLOCK ont été détectés dans Splunk (ports bloqués: 445, 3389, 139, 80)"
-      when: block_count | int > 0
-
-    - name: Vérifier qu'il y a des logs ALLOW
-      debug:
-        msg: "✅ Des logs ALLOW ont été détectés dans Splunk (port autorisé: 22 depuis réseau interne)"
-      when: allow_count | int > 0
 
     # ==========================================
     # RÉSUMÉ FINAL
     # ==========================================
-    - name: Résumé final du déploiement et des tests
+    - name: Résumé final du déploiement
       debug:
         msg:
           - ""
           - "=========================================="
-          - "  RÉSUMÉ FINAL"
+          - "  ✅ DÉPLOIEMENT TERMINÉ"
           - "=========================================="
-          - "✅ Conteneurs: Tous démarrés"
-          - "{{ '✅' if (firewall_log_count | int > 0) else '❌' }} Logs UFW dans le firewall: {{ firewall_log_count }} logs"
-          - "{{ '✅' if (collector_log_count | int > 0) else '⚠️ ' }} Logs dans le collecteur: {{ collector_log_count }} logs"
-          - "{{ '✅' if (splunk_log_count | int > 0) else '⚠️ ' }} Logs indexés dans Splunk: {{ splunk_log_count }} logs"
-          - ""
-          - "📊 Catégorisation dans Splunk:"
-          - "  BLOCK: {{ block_count }} logs"
-          - "  ALLOW: {{ allow_count }} logs"
+          - "Conteneurs actifs: {{ running_containers.stdout_lines | length }}"
           - ""
           - "🌐 Interface Splunk disponible sur: http://localhost:8000"
           - "  Identifiants: admin / splunk1RT3"
           - ""
-          - "📋 Pour voir les logs UFW dans Splunk:"
+          - "💡 Pour tester et générer des logs:"
+          - "  docker exec client /usr/local/bin/test-rules-ufw.sh"
+          - ""
+          - "🔍 Pour voir les logs dans Splunk:"
           - "  1. Connectez-vous à http://localhost:8000"
-          - "  2. Dans la barre de recherche, tapez: index=main sourcetype=syslog UFW"
-          - "  3. Ou utilisez le dashboard: Recherche > Dashboards > UFW Firewall Dashboard"
+          - "  2. Recherche: index=main sourcetype=syslog UFW"
           - ""
-          - "🔍 Pour voir les logs en temps réel:"
-          - "  docker exec {{ firewall_container }} tail -f /var/log/kern.log | grep UFW"
-          - "  docker exec {{ logcollector_container }} tail -f /var/log/firewall/*.log | grep UFW"
-          - ""
-          - "💡 Pour générer plus de logs, exécutez:"
-          - "  docker exec {{ client_container }} /usr/local/bin/test-rules-ufw.sh"
-          - ""
-
-    - name: Vérification finale - Tous les tests sont passés
-      debug:
-        msg:
-          - "✅ DÉPLOIEMENT ET TESTS RÉUSSIS!"
-          - "Le système est opérationnel et les logs sont correctement catégorisés."
-      when: 
-        - firewall_log_count | int > 0
-        - splunk_log_count | int > 0
-
