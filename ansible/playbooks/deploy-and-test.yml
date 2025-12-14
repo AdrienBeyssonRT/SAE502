@@ -1,7 +1,6 @@
 ---
 - name: Déploiement complet et test automatisé du système de logs UFW
   hosts: all
-  become: yes
   vars:
     playbook_dir: "{{ playbook_dir | default(ansible_env.PWD | default('/tmp')) }}/ansible/playbooks"
     project_root: "{{ playbook_dir | dirname | dirname }}"

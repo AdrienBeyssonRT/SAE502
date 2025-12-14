@@ -259,15 +259,30 @@ cd "$SCRIPT_DIR"
 # Si l'utilisateur n'est pas root mais a utilisé sudo, utiliser l'utilisateur original
 if [ -n "$SUDO_USER" ]; then
     print_info "Déploiement en tant que $SUDO_USER..."
-    print_warn "Si vous avez des problèmes avec Docker, exécutez: newgrp docker"
+    
+    # Vérifier si l'utilisateur peut utiliser docker sans sudo
+    if sudo -u "$SUDO_USER" docker ps &> /dev/null; then
+        print_info "✅ Docker accessible sans sudo pour $SUDO_USER"
+    else
+        print_warn "⚠️  Docker nécessite sudo pour $SUDO_USER"
+        print_warn "   Cela peut être dû au fait que vous venez d'être ajouté au groupe docker."
+        print_warn "   Le playbook va essayer de s'exécuter, mais si cela échoue:"
+        print_warn "   1. Déconnectez-vous et reconnectez-vous, OU"
+        print_warn "   2. Exécutez dans un nouveau terminal: newgrp docker"
+        print_warn "   3. Puis relancez: ansible-playbook ansible/playbooks/deploy-and-test.yml"
+        echo ""
+    fi
     echo ""
     
     # Exécuter le playbook en tant que l'utilisateur original
+    # Le playbook n'utilise plus become: yes, donc pas besoin de sudo
     sudo -u "$SUDO_USER" ansible-playbook ansible/playbooks/deploy-and-test.yml || {
         echo ""
         print_warn "⚠️  Déploiement échoué. Vérifiez les erreurs ci-dessus."
         echo ""
-        print_info "Essayez manuellement:"
+        print_info "Si le problème est lié à Docker, essayez:"
+        echo "  newgrp docker"
+        echo "  cd $SCRIPT_DIR"
         echo "  ansible-playbook ansible/playbooks/deploy-and-test.yml"
         exit 1
     }
