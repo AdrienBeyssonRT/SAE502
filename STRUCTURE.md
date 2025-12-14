@@ -39,8 +39,7 @@ SAE502 final/
     └── client/                    # Conteneur client de test
         ├── Dockerfile
         ├── entrypoint.sh
-        ├── force-ufw-logs.sh      # Script optimisé pour générer des logs UFW
-        └── test-rules-ufw.sh      # Script de test des règles UFW
+        └── test-rules-ufw.sh      # Script de test des règles UFW (génère des logs)
 ```
 
 ## Description des composants

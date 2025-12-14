@@ -9,7 +9,6 @@ RUN apt-get update && \
 
 # Scripts de test
 COPY test-rules-ufw.sh /usr/local/bin/test-rules-ufw.sh
-COPY force-ufw-logs.sh /usr/local/bin/force-ufw-logs.sh
 RUN chmod +x /usr/local/bin/*.sh
 
 WORKDIR /root

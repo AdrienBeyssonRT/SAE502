@@ -227,10 +227,10 @@ ansible-playbook ansible/playbooks/deploy.yml
 ### Étape 3 : Génération de trafic et vérification
 
 ```bash
-# Générer du trafic
-docker exec client /usr/local/bin/force-ufw-logs.sh firewall 5
+# Exécuter les tests UFW (génère automatiquement des logs)
+docker exec client /usr/local/bin/test-rules-ufw.sh
 
-# Attendre 5 secondes
+# Attendre 5 secondes pour que les logs remontent
 sleep 5
 
 # Vérifier les logs
@@ -259,10 +259,7 @@ docker-compose logs -f
 # Entrer dans le conteneur client
 docker exec -it client bash
 
-# Générer du trafic
-/usr/local/bin/force-ufw-logs.sh firewall 5
-
-# Tester les règles
+# Exécuter les tests UFW (génère automatiquement des logs)
 /usr/local/bin/test-rules-ufw.sh
 ```
 
@@ -306,9 +303,9 @@ docker-compose restart
    docker exec firewall ufw logging high
    ```
 
-3. Générer du trafic :
+3. Générer du trafic via les tests :
    ```bash
-   docker exec client /usr/local/bin/force-ufw-logs.sh firewall 5
+   docker exec client /usr/local/bin/test-rules-ufw.sh
    ```
 
 4. Vérifier immédiatement (dans les 2 secondes) :

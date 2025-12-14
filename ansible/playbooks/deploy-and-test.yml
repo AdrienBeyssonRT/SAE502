@@ -149,8 +149,8 @@
     # ==========================================
     # ÉTAPE 4 : GÉNÉRATION DE TRAFIC
     # ==========================================
-    - name: Générer du trafic pour créer des logs UFW
-      command: docker exec {{ client_container }} /usr/local/bin/force-ufw-logs.sh {{ firewall_host }} 5
+    - name: Exécuter les tests UFW pour générer des logs
+      command: docker exec {{ client_container }} /usr/local/bin/test-rules-ufw.sh
       register: traffic_result
       changed_when: false
       failed_when: false
