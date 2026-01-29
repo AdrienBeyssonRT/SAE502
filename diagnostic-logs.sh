@@ -21,6 +21,16 @@ if "$GENERATE_TRAFFIC"; then
   echo ""
 fi
 
+echo "1a. IP / interfaces / règles UFW (le trafic atteint-il le firewall ?)"
+echo "----------------------------------------"
+echo "   IP du firewall (depuis client) :"
+docker exec client getent hosts firewall 2>/dev/null | awk '{print "     " $2 " -> " $1}' || echo "     (résolution échouée)"
+echo "   Interfaces et IP dans le firewall :"
+docker exec firewall ip -4 addr show 2>/dev/null | grep -E 'inet |^[0-9]:' | sed 's/^/     /' || docker exec firewall hostname -I 2>/dev/null | sed 's/^/     /'
+echo "   Compteurs iptables INPUT (pkts) — doivent augmenter après test-rules-ufw.sh :"
+docker exec firewall iptables -L INPUT -v -n 2>/dev/null | head -20 | sed 's/^/     /'
+echo ""
+
 echo "1. Logs UFW dans le FIREWALL (kern.log)"
 echo "----------------------------------------"
 if docker exec firewall tail -20 /var/log/kern.log 2>/dev/null | grep -i ufw; then
@@ -109,9 +119,10 @@ echo ""
 echo "=========================================="
 echo "  RÉSUMÉ"
 echo "=========================================="
+echo "• Si 1a : compteurs iptables à 0 après --generate-traffic → trafic n'atteint pas le firewall (IP/réseau). Sinon trafic OK, problème = visibilité logs noyau."
 echo "• Si 1/1b/1d vides : lancer : ./diagnostic-logs.sh --generate-traffic  (génère du trafic puis revérifie)"
 echo "• Si 1c manquant : sudo cp ansible/files/99-splunk-ufw.conf /etc/rsyslog.d/ && sudo systemctl restart rsyslog"
-echo "• Si 1b et 1d vides après --generate-traffic : les logs UFW du conteneur ne remontent pas sur l'hôte (limitation noyau/Docker)"
+echo "• Si 1b et 1d vides : logs noyau du conteneur non visibles sur l'hôte (limitation noyau/Docker) ; seuls les vrais logs UFW apparaîtront dans Splunk si visibles"
 echo "• Si 2 échoue   : redémarrer le firewall : docker compose restart firewall"
 echo "• Si 3 échoue   : vérifier docker compose (firewall + splunk sur logs_network)"
 echo "• Si 4 est vide : reconstruire l'image Splunk : docker compose build splunk && docker compose up -d splunk"
