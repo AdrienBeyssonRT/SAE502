@@ -14,6 +14,8 @@ services:
       - NET_ADMIN
       - NET_RAW
     privileged: true
+    security_opt:
+      - apparmor=unconfined
     environment:
       - INTERNAL_NETWORK=172.20.0.0/16
       - LOGGING_LEVEL=high
@@ -21,22 +23,7 @@ services:
       - /lib/modules:/lib/modules:ro
     restart: unless-stopped
 
-  logcollector:
-    build:
-      context: ./containers/logcollector
-      dockerfile: Dockerfile
-    container_name: logcollector
-    hostname: logcollector
-    networks:
-      - logs_network
-      - supervision_network
-    ports:
-      - "514:514/udp"
-    volumes:
-      - firewall_logs:/var/log/firewall
-    restart: unless-stopped
-
-  # Splunk : image personnalisée avec inputs.conf, props.conf et tableau de bord UFW
+  # Splunk : réception directe des logs UFW depuis le firewall (UDP 514)
   splunk:
     build:
       context: ./containers/splunk
@@ -58,8 +45,6 @@ services:
     volumes:
       - splunk_data:/opt/splunk/var
     restart: unless-stopped
-    depends_on:
-      - logcollector
     healthcheck:
       disable: true
 
@@ -112,8 +97,6 @@ networks:
         - subnet: 172.23.0.0/16
 
 volumes:
-  firewall_logs:
-    driver: local
   splunk_data:
     driver: local
 

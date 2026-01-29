@@ -4,9 +4,8 @@
 
 Déployer automatiquement une infrastructure Docker comprenant :
 
-- **`firewall`** : pare-feu Linux avec **UFW** (règles + `logging high`)
-- **`logcollector`** : serveur **rsyslog** (réception syslog UDP 514, stockage local)
-- **`splunk`** : supervision / recherche des logs (réception syslog, dashboard fourni)
+- **`firewall`** : pare-feu Linux avec **UFW** (règles + `logging high`), envoi des logs kernel vers Splunk en UDP 514
+- **`splunk`** : supervision / recherche des logs (réception syslog UDP 514, dashboard fourni)
 - **`client`** + **`attacker`** : conteneurs de test (outils réseau + script de test)
 
 L’objectif final est de **visualiser dans Splunk** les événements UFW (BLOCK/ALLOW) suite à des tests réseau.
@@ -17,17 +16,16 @@ L’objectif final est de **visualiser dans Splunk** les événements UFW (BLOCK
 
 | Service | Rôle |
 |---|---|
-| `firewall` | UFW + génération de logs kernel |
-| `logcollector` | réception/centralisation syslog |
-| `splunk` | indexation + dashboard |
+| `firewall` | UFW + envoi des logs kernel vers Splunk (UDP 514) |
+| `splunk` | réception syslog UDP 514 + indexation + dashboard |
 | `client` | tests internes (réseau `firewall_network`) |
 | `attacker` | tests externes (réseau `tests_network`) |
 
 ### Réseaux Docker
 
 - `firewall_network` : `firewall` ↔ `client`
-- `logs_network` : `firewall` ↔ `logcollector` ↔ `splunk`
-- `supervision_network` : `logcollector` ↔ `splunk`
+- `logs_network` : `firewall` ↔ `splunk`
+- `supervision_network` : `splunk`
 - `tests_network` : `client` / `attacker`
 
 ## Prérequis
