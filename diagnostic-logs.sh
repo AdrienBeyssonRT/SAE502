@@ -58,6 +58,21 @@ fi
 systemctl is-active rsyslog &>/dev/null && echo "   Service rsyslog : actif" || echo "   Service rsyslog : inactif ou absent"
 echo ""
 
+echo "1d. Fichier kern.log sur l'HÔTE (/var/log/kern.log)"
+echo "----------------------------------------"
+if [ -r /var/log/kern.log ]; then
+  if grep -i ufw /var/log/kern.log 2>/dev/null | tail -5; then
+    : # des logs UFW trouvés
+  else
+    echo "   Aucun log UFW dans /var/log/kern.log de l'hôte"
+    echo "   Dernières lignes du fichier :"
+    tail -5 /var/log/kern.log 2>/dev/null | sed 's/^/   /'
+  fi
+else
+  echo "   Fichier /var/log/kern.log absent ou illisible"
+fi
+echo ""
+
 echo "2. Rsyslog tourne dans le firewall ?"
 echo "----------------------------------------"
 docker exec firewall ps aux 2>/dev/null | grep -E "rsyslog|PID" || echo "   Rsyslog non trouvé ou conteneur firewall absent"
@@ -94,8 +109,9 @@ echo ""
 echo "=========================================="
 echo "  RÉSUMÉ"
 echo "=========================================="
-echo "• Si 1/1b vides : lancer : ./diagnostic-logs.sh --generate-traffic  (génère du trafic puis revérifie)"
+echo "• Si 1/1b/1d vides : lancer : ./diagnostic-logs.sh --generate-traffic  (génère du trafic puis revérifie)"
 echo "• Si 1c manquant : sudo cp ansible/files/99-splunk-ufw.conf /etc/rsyslog.d/ && sudo systemctl restart rsyslog"
+echo "• Si 1b et 1d vides après --generate-traffic : les logs UFW du conteneur ne remontent pas sur l'hôte (limitation noyau/Docker)"
 echo "• Si 2 échoue   : redémarrer le firewall : docker compose restart firewall"
 echo "• Si 3 échoue   : vérifier docker compose (firewall + splunk sur logs_network)"
 echo "• Si 4 est vide : reconstruire l'image Splunk : docker compose build splunk && docker compose up -d splunk"
