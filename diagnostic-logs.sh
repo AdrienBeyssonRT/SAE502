@@ -13,7 +13,16 @@ echo "----------------------------------------"
 if docker exec firewall tail -20 /var/log/kern.log 2>/dev/null | grep -i ufw; then
   : # des logs UFW sont présents
 else
-  echo "   Aucun log UFW dans kern.log"
+  echo "   Aucun log UFW dans kern.log du conteneur"
+fi
+echo ""
+
+echo "1b. Logs noyau sur l'HÔTE (dmesg) — source réelle des logs UFW"
+echo "----------------------------------------"
+if dmesg 2>/dev/null | grep -i ufw | tail -10; then
+  : # des logs UFW sont présents sur l'hôte
+else
+  echo "   Aucun log UFW dans dmesg (générer du trafic : test-rules-ufw.sh)"
 fi
 echo ""
 
@@ -53,7 +62,8 @@ echo ""
 echo "=========================================="
 echo "  RÉSUMÉ"
 echo "=========================================="
-echo "• Si 1 est vide : générer du trafic : docker exec client /usr/local/bin/test-rules-ufw.sh"
+echo "• Si 1/1b vides : générer du trafic : docker exec client /usr/local/bin/test-rules-ufw.sh"
+echo "• Si 1b OK mais 5 vide : l'hôte envoie vers Splunk (rsyslog) — relancer deploy ou : sudo cp ansible/files/99-splunk-ufw.conf /etc/rsyslog.d/ && sudo systemctl restart rsyslog"
 echo "• Si 2 échoue   : redémarrer le firewall : docker compose restart firewall"
 echo "• Si 3 échoue   : vérifier docker compose (firewall + splunk sur logs_network)"
 echo "• Si 4 est vide : reconstruire l'image Splunk : docker compose build splunk && docker compose up -d splunk"

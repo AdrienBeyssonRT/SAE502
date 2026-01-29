@@ -94,6 +94,30 @@
       failed_when: false
 
     # ==========================================
+    # ÉTAPE 4 : RSYSLOG HÔTE → SPLUNK (logs noyau UFW)
+    # ==========================================
+    # Les logs UFW du conteneur firewall sont émis par le noyau de l'hôte.
+    # On configure l'hôte pour envoyer kern.* à Splunk (port 514 exposé).
+    - name: S'assurer que rsyslog est installé sur l'hôte
+      ansible.builtin.apt:
+        name: rsyslog
+        state: present
+      become: true
+
+    - name: Copier la config rsyslog pour envoi kern.* vers Splunk
+      ansible.builtin.copy:
+        src: "{{ project_root }}/ansible/files/99-splunk-ufw.conf"
+        dest: /etc/rsyslog.d/99-splunk-ufw.conf
+        mode: "0644"
+      become: true
+
+    - name: Redémarrer rsyslog sur l'hôte
+      ansible.builtin.service:
+        name: rsyslog
+        state: restarted
+      become: true
+
+    # ==========================================
     # RÉSUMÉ FINAL
     # ==========================================
     - name: Résumé final du déploiement
