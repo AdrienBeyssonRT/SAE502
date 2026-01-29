@@ -1,12 +1,25 @@
 #!/bin/bash
 # Diagnostic de la chaîne de logs : firewall → Splunk (direct, sans logcollector)
 # À lancer depuis la racine du projet sur la VM
+# Option : ./diagnostic-logs.sh --generate-traffic  (génère du trafic avant les vérifications)
+
+GENERATE_TRAFFIC=false
+[[ "${1:-}" == "--generate-traffic" || "${1:-}" == "-g" ]] && GENERATE_TRAFFIC=true
 
 echo "=========================================="
 echo "  DIAGNOSTIC CHAÎNE DE LOGS UFW"
 echo "  (firewall → Splunk)"
 echo "=========================================="
 echo ""
+
+if "$GENERATE_TRAFFIC"; then
+  echo "0. Génération de trafic UFW (test-rules-ufw.sh)..."
+  echo "----------------------------------------"
+  docker exec client /usr/local/bin/test-rules-ufw.sh 2>/dev/null || true
+  echo "   Attente 15 s pour propagation des logs..."
+  sleep 15
+  echo ""
+fi
 
 echo "1. Logs UFW dans le FIREWALL (kern.log)"
 echo "----------------------------------------"
@@ -22,8 +35,27 @@ echo "----------------------------------------"
 if dmesg 2>/dev/null | grep -i ufw | tail -10; then
   : # des logs UFW sont présents sur l'hôte
 else
-  echo "   Aucun log UFW dans dmesg (générer du trafic : test-rules-ufw.sh)"
+  # Essayer aussi BLOCK/iptables (format netfilter)
+  if dmesg 2>/dev/null | grep -iE 'BLOCK|iptables|nf_log' | tail -5; then
+    : # des logs type firewall trouvés
+  else
+    echo "   Aucun log UFW dans dmesg"
+    echo "   Derniers messages noyau :"
+    dmesg 2>/dev/null | tail -6 | sed 's/^/   /'
+    echo "   → Générer du trafic puis relancer : ./diagnostic-logs.sh --generate-traffic"
+  fi
 fi
+echo ""
+
+echo "1c. Rsyslog sur l'HÔTE (config Splunk + service)"
+echo "----------------------------------------"
+if [ -f /etc/rsyslog.d/99-splunk-ufw.conf ]; then
+  echo "   Config OK : /etc/rsyslog.d/99-splunk-ufw.conf"
+  grep -v '^#' /etc/rsyslog.d/99-splunk-ufw.conf | grep -v '^$' | sed 's/^/   /'
+else
+  echo "   Config absente : sudo cp ansible/files/99-splunk-ufw.conf /etc/rsyslog.d/ && sudo systemctl restart rsyslog"
+fi
+systemctl is-active rsyslog &>/dev/null && echo "   Service rsyslog : actif" || echo "   Service rsyslog : inactif ou absent"
 echo ""
 
 echo "2. Rsyslog tourne dans le firewall ?"
@@ -62,8 +94,8 @@ echo ""
 echo "=========================================="
 echo "  RÉSUMÉ"
 echo "=========================================="
-echo "• Si 1/1b vides : générer du trafic : docker exec client /usr/local/bin/test-rules-ufw.sh"
-echo "• Si 1b OK mais 5 vide : l'hôte envoie vers Splunk (rsyslog) — relancer deploy ou : sudo cp ansible/files/99-splunk-ufw.conf /etc/rsyslog.d/ && sudo systemctl restart rsyslog"
+echo "• Si 1/1b vides : lancer : ./diagnostic-logs.sh --generate-traffic  (génère du trafic puis revérifie)"
+echo "• Si 1c manquant : sudo cp ansible/files/99-splunk-ufw.conf /etc/rsyslog.d/ && sudo systemctl restart rsyslog"
 echo "• Si 2 échoue   : redémarrer le firewall : docker compose restart firewall"
 echo "• Si 3 échoue   : vérifier docker compose (firewall + splunk sur logs_network)"
 echo "• Si 4 est vide : reconstruire l'image Splunk : docker compose build splunk && docker compose up -d splunk"
