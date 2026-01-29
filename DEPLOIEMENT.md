@@ -81,31 +81,30 @@ ansible-playbook ansible/playbooks/deploy-and-test.yml
 | Conteneur | Rôle | Réseaux | Ports |
 |-----------|------|---------|-------|
 | **firewall** | Pare-feu UFW | firewall_network, logs_network | - |
-| **logcollector** | Serveur rsyslog | logs_network, supervision_network | 514/udp |
 | **splunk** | Plateforme de supervision Splunk | supervision_network, logs_network | 8000, 514/udp |
 | **client** | Conteneur de test | firewall_network, tests_network | - |
+| **attacker** | Conteneur de test (trafic bloqué) | tests_network | - |
 
 ### Réseaux Docker
 
 - `firewall_network` (172.20.0.0/16) : Réseau pour firewall et client
-- `logs_network` (172.21.0.0/16) : Réseau pour firewall et logcollector
-- `supervision_network` (172.22.0.0/16) : Réseau pour logcollector et Splunk
+- `logs_network` (172.21.0.0/16) : Réseau pour firewall et Splunk (envoi direct des logs)
+- `supervision_network` (172.22.0.0/16) : Réseau Splunk
 - `tests_network` (172.23.0.0/16) : Réseau pour les tests
 
 ## 🔄 Flux des logs
 
 ```
-┌──────────┐      ┌──────────────┐      ┌─────────────┐      ┌──────────────┐
-│ Firewall │ ───> │ Logcollector │ ───> │ Supervision │ ───> │ Interface Web│
-│   UFW    │ UDP  │    rsyslog   │ Vol  │    Splunk   │ HTTP │  Port 8000   │
-└──────────┘ 514  └──────────────┘      └─────────────┘      └──────────────┘
+┌──────────┐                    ┌─────────────┐      ┌──────────────┐
+│ Firewall │ ─────────────────>│   Splunk    │ ───> │ Interface Web│
+│   UFW    │  UDP 514 (rsyslog) │  UDP 514    │ HTTP │  Port 8000   │
+└──────────┘                    └─────────────┘      └──────────────┘
 ```
 
-1. **Génération** : UFW génère des logs dans `/var/log/kern.log`
-2. **Envoi** : rsyslog dans le firewall envoie les logs au logcollector via UDP 514
-3. **Collecte** : rsyslog dans le logcollector stocke les logs dans `/var/log/firewall/`
-4. **Parsing** : L'application Flask lit et parse les logs depuis le volume partagé
-5. **Affichage** : L'interface web affiche les logs catégorisés (BLOCK, ALLOW, LIMIT)
+1. **Génération** : UFW génère des logs kernel dans le buffer noyau
+2. **Envoi** : rsyslog (imklog) dans le firewall envoie les logs directement à Splunk via UDP 514
+3. **Réception** : Splunk écoute sur UDP 514 et indexe les logs (sourcetype=syslog)
+4. **Affichage** : L'interface web Splunk affiche les logs (recherche : `index=main sourcetype=syslog UFW`)
 
 ## 🔒 Règles UFW configurées
 
@@ -116,7 +115,7 @@ ansible-playbook ansible/playbooks/deploy-and-test.yml
 
 ### Services autorisés
 - **SSH interne** : `allow from 172.20.0.0/16 to any port 22`
-- **Envoi des logs** : `allow out 514/udp`
+- **Envoi des logs** : `allow out 514/udp` (vers Splunk)
 - **DNS sortant** : `allow out 53/udp` et `53/tcp`
 - **Web sortant** : `allow out 80/tcp` et `443/tcp`
 
@@ -149,7 +148,12 @@ Le playbook `deploy-and-test.yml` génère automatiquement du trafic sur :
 docker ps
 ```
 
-Vous devriez voir : `firewall`, `logcollector`, `splunk`, `client`
+Vous devriez voir **4 conteneurs** : `firewall`, `splunk`, `client`, `attacker`.
+
+> **Si vous voyez encore `logcollector`** : votre répertoire de projet contient une ancienne version. Le flux actuel est **firewall → Splunk** (sans logcollector). Mettez à jour les fichiers (git pull ou copie du dépôt), puis exécutez :
+> ```bash
+> docker compose down && docker compose up -d
+> ```
 
 ### 2. Vérifier UFW
 
@@ -169,15 +173,7 @@ docker exec firewall tail -30 /var/log/kern.log | grep -i ufw
 
 Vous devriez voir des logs UFW avec `[UFW BLOCK]` ou `[UFW ALLOW]`.
 
-### 4. Vérifier les logs dans le collecteur
-
-```bash
-docker exec logcollector tail -20 /var/log/firewall/*.log | grep -i ufw
-```
-
-Vous devriez voir les mêmes logs que dans le firewall.
-
-### 5. Vérifier l'interface web
+### 4. Vérifier l'interface web
 
 Ouvrez **http://localhost:8000** dans votre navigateur et connectez-vous avec :
 - **Utilisateur** : `admin`
@@ -193,7 +189,7 @@ Vous devriez voir :
 - ✅ Catégorisation correcte (BLOCK, ALLOW, LIMIT)
 - ✅ Top IP sources, top ports, répartition par protocole
 
-### 6. Vérifier l'API
+### 5. Vérifier la recherche Splunk
 
 ```bash
 # Statistiques
@@ -233,9 +229,11 @@ docker exec client /usr/local/bin/test-rules-ufw.sh
 # Attendre 5 secondes pour que les logs remontent
 sleep 5
 
-# Vérifier les logs
+# Vérifier les logs dans le firewall
 docker exec firewall tail -30 /var/log/kern.log | grep -i ufw
-docker exec logcollector tail -20 /var/log/firewall/*.log | grep -i ufw
+
+# Diagnostic complet de la chaîne firewall → Splunk
+./diagnostic-logs.sh
 ```
 
 ## 🔧 Commandes utiles
@@ -246,11 +244,8 @@ docker exec logcollector tail -20 /var/log/firewall/*.log | grep -i ufw
 # Logs UFW dans le firewall
 docker exec firewall tail -f /var/log/kern.log | grep UFW
 
-# Logs dans le collecteur
-docker exec logcollector tail -f /var/log/firewall/*.log | grep UFW
-
 # Logs de tous les conteneurs
-docker-compose logs -f
+docker compose logs -f
 ```
 
 ### Tester manuellement
@@ -313,78 +308,60 @@ docker-compose restart
    docker exec firewall tail -30 /var/log/kern.log | grep -i ufw
    ```
 
-### Les logs ne remontent pas au collecteur
+### Les logs ne remontent pas à Splunk
 
 1. Vérifier que rsyslog fonctionne dans le firewall :
    ```bash
    docker exec firewall ps aux | grep rsyslog
    ```
 
-2. Vérifier la connexion réseau :
+2. Vérifier la connectivité firewall → Splunk :
    ```bash
-   docker exec firewall ping -c 2 logcollector
+   docker exec firewall ping -c 2 splunk
    ```
 
-3. Vérifier que rsyslog fonctionne dans le logcollector :
+3. Lancer le script de diagnostic :
    ```bash
-   docker exec logcollector ps aux | grep rsyslog
+   ./diagnostic-logs.sh
    ```
 
-4. Vérifier les logs du collecteur :
+4. Vérifier la config Splunk (entrée UDP 514) :
    ```bash
-   docker exec logcollector ls -la /var/log/firewall/
-   docker exec logcollector tail -20 /var/log/firewall/*.log
+   docker exec splunk cat /opt/splunk/etc/system/local/inputs.conf | grep -A5 udp
    ```
 
-### Les logs ne s'affichent pas dans l'interface web
+### Les logs ne s'affichent pas dans Splunk
 
-1. Vérifier que le conteneur supervision est en cours d'exécution :
+1. Vérifier que Splunk est en cours d'exécution :
    ```bash
-   docker ps | grep supervision
+   docker ps | grep splunk
    ```
 
-2. Vérifier l'API :
-   ```bash
-   curl http://localhost:5000/api/debug
-   ```
+2. Attendre 1 à 2 minutes après le démarrage (Splunk peut être lent à démarrer).
 
-3. Vérifier les logs de supervision :
+3. Recherche dans Splunk (CLI) :
    ```bash
-   docker-compose logs supervision
-   ```
-
-4. Redémarrer le conteneur supervision :
-   ```bash
-   docker-compose restart supervision
+   docker exec splunk /opt/splunk/bin/splunk search 'index=main sourcetype=syslog UFW' -auth admin:splunk1RT3
    ```
 
 ### Les logs ne sont pas correctement catégorisés
 
-1. Vérifier les logs bruts dans le collecteur :
+1. Vérifier les logs bruts dans le firewall :
    ```bash
-   docker exec logcollector tail -10 /var/log/firewall/*.log
+   docker exec firewall tail -20 /var/log/kern.log | grep UFW
    ```
 
-2. Vérifier que les logs contiennent `[UFW BLOCK]` ou `[UFW ALLOW]` :
-   ```bash
-   docker exec logcollector grep -i "UFW BLOCK\|UFW ALLOW" /var/log/firewall/*.log | head -5
-   ```
-
-3. Vérifier l'API de debug pour voir les logs parsés :
-   ```bash
-   docker exec splunk /opt/splunk/bin/splunk search 'index=main sourcetype=syslog "UFW" | head 10' -auth admin:splunk1RT3
-   ```
+2. Vérifier que les logs contiennent `[UFW BLOCK]` ou `[UFW ALLOW]`.
 
 ## 📈 Résultat attendu
 
 Après le déploiement, vous devriez avoir :
 
-- ✅ **4 conteneurs** en cours d'exécution
+- ✅ **4 conteneurs** en cours d'exécution (firewall, splunk, client, attacker)
 - ✅ **UFW actif** avec logging high
-- ✅ **Logs UFW** générés dans `/var/log/kern.log` du firewall
-- ✅ **Logs collectés** dans `/var/log/firewall/*.log` du logcollector
+- ✅ **Logs UFW** générés et envoyés par rsyslog (firewall) vers Splunk en UDP 514
 - ✅ **Logs indexés** dans Splunk et analysables via l'interface web
-- ✅ **Recherches** possibles pour filtrer par action (BLOCK, ALLOW), IP sources, ports
+- ✅ **Recherches** possibles : `index=main sourcetype=syslog UFW` pour filtrer par action (BLOCK, ALLOW), IP sources, ports
 
 ## 🔗 Liens utiles
 

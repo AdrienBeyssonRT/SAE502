@@ -31,7 +31,7 @@ echo "Configuration des services internes..."
 # SSH interne depuis le réseau interne
 ufw allow from $INTERNAL_NETWORK to any port 22 proto tcp comment 'SSH interne'
 # Envoi des logs vers le collecteur
-ufw allow out 514/udp comment 'Envoi logs vers logcollector'
+ufw allow out 514/udp comment 'Envoi logs vers Splunk'
 
 # Trafic utile autorisé
 echo "Configuration du trafic sortant autorisé..."

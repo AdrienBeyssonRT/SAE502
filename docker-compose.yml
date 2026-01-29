@@ -21,6 +21,9 @@ services:
       - LOGGING_LEVEL=high
     volumes:
       - /lib/modules:/lib/modules:ro
+    # Accès au buffer noyau pour que rsyslog (imklog) reçoive les logs UFW/netfilter
+    devices:
+      - /dev/kmsg:/dev/kmsg
     restart: unless-stopped
 
   # Splunk : réception directe des logs UFW depuis le firewall (UDP 514)

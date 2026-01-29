@@ -26,10 +26,7 @@ SAE502 final/
     │   ├── rsyslog.conf           # Configuration rsyslog (envoi logs)
     │   └── setup-ufw.sh           # Script de configuration UFW
     │
-    ├── logcollector/              # Conteneur collecteur de logs
-    │   ├── Dockerfile
-    │   ├── entrypoint.sh
-    │   └── rsyslog.conf           # Configuration rsyslog serveur
+    │   # logcollector retiré : envoi direct firewall → Splunk
     │
     ├── splunk/                    # Conteneur Splunk pour supervision
     │   ├── inputs.conf            # Configuration réception syslog (UDP 514)
@@ -96,8 +93,8 @@ Chaque conteneur contient :
 
 Définis dans `docker-compose.yml` :
 - `firewall_network` (172.20.0.0/16) : Réseau pour le firewall et le client
-- `logs_network` (172.21.0.0/16) : Réseau pour le firewall et le logcollector
-- `supervision_network` (172.22.0.0/16) : Réseau pour le logcollector et Splunk
+- `logs_network` (172.21.0.0/16) : Réseau pour le firewall et Splunk (envoi direct des logs)
+- `supervision_network` (172.22.0.0/16) : Réseau Splunk
 - `tests_network` (172.23.0.0/16) : Réseau pour les tests
 
 ## Points d'entrée

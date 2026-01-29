@@ -9,10 +9,10 @@ Automatiser le déploiement complet d'un pare-feu Linux (UFW), centraliser ses j
 ### Infrastructure technique
 
 - ✅ **4 conteneurs Docker** :
-  - `firewall` : Pare-feu UFW avec règles de sécurité
-  - `logcollector` : Serveur rsyslog pour centralisation
-  - `supervision` : Application Flask de visualisation
+  - `firewall` : Pare-feu UFW avec règles de sécurité (rsyslog envoie les logs à Splunk)
+  - `splunk` : Plateforme de supervision (réception UDP 514, interface web)
   - `client` : Conteneur de test avec outils réseau
+  - `attacker` : Conteneur pour générer du trafic bloqué
 
 - ✅ **4 réseaux Docker distincts** :
   - `firewall_network` (172.20.0.0/16)
@@ -22,9 +22,8 @@ Automatiser le déploiement complet d'un pare-feu Linux (UFW), centraliser ses j
 
 ### Services fonctionnels
 
-- ✅ **Firewall** : UFW configuré avec toutes les règles spécifiées
-- ✅ **Logcollector** : rsyslog en mode serveur UDP (port 514)
-- ✅ **Supervision** : Interface web avec tableaux de bord et API REST
+- ✅ **Firewall** : UFW configuré avec toutes les règles spécifiées ; rsyslog envoie les logs à Splunk
+- ✅ **Splunk** : Réception des logs en UDP 514, interface web (port 8000), tableaux de bord UFW
 - ✅ **Client** : Outils de test (nmap, curl, nc, ping)
 
 ### Règles UFW implémentées
@@ -43,8 +42,7 @@ Automatiser le déploiement complet d'un pare-feu Linux (UFW), centraliser ses j
 
 - ✅ **docker** : Installation Docker + préparation système
 - ✅ **firewall** : Construction image + configuration UFW
-- ✅ **logcollector** : Déploiement serveur rsyslog
-- ✅ **supervision** : Installation application Flask
+- ✅ **splunk** : Image Splunk avec entrée UDP 514 et dashboard UFW
 - ✅ **client** : Installation outils de test
 - ✅ **docker_compose** : Orchestration complète
 
@@ -70,29 +68,27 @@ Automatiser le déploiement complet d'un pare-feu Linux (UFW), centraliser ses j
 ┌─────────────────────────────────────────────────────────┐
 │                    Machine Virtuelle                    │
 │                                                         │
-│  ┌──────────┐    ┌──────────────┐    ┌─────────────┐ │
-│  │ Firewall │───▶│ Logcollector │───▶│ Supervision │ │
-│  │  (UFW)   │    │  (rsyslog)   │    │   (Flask)   │ │
-│  └────┬─────┘    └──────────────┘    └─────────────┘ │
-│       │                                               │
-│       │                                               │
-│  ┌────▼─────┐                                         │
-│  │  Client  │                                         │
-│  │ (tests)  │                                         │
-│  └──────────┘                                         │
+│  ┌──────────┐                    ┌─────────────┐      │
+│  │ Firewall │ ──────────────────▶│   Splunk    │      │
+│  │  (UFW)   │  UDP 514 (rsyslog) │  (port 8000)│      │
+│  └────┬─────┘                    └─────────────┘      │
+│       │                                                 │
+│  ┌────▼─────┐    ┌──────────┐                          │
+│  │  Client  │    │ Attacker  │                          │
+│  │ (tests)  │    │ (trafic)  │                          │
+│  └──────────┘    └──────────┘                          │
 │                                                         │
-│  Réseaux: firewall, logs, supervision, tests          │
+│  Réseaux: firewall_network, logs_network, tests_network │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ### Flux de données
 
-1. **Génération de trafic** : Le conteneur client génère du trafic vers le firewall
-2. **Filtrage** : UFW applique les règles et génère des logs dans `/var/log/kern.log`
-3. **Collecte** : rsyslog dans le firewall envoie les logs au logcollector via UDP
-4. **Stockage** : Le logcollector stocke les logs dans `/var/log/firewall/`
-5. **Visualisation** : L'application Flask lit les logs et les affiche
-6. **Analyse** : L'utilisateur consulte les statistiques et logs en temps réel
+1. **Génération de trafic** : Le conteneur client (ou attacker) génère du trafic vers le firewall
+2. **Filtrage** : UFW applique les règles ; les logs kernel (dont UFW) sont captés par rsyslog (imklog)
+3. **Envoi** : rsyslog dans le firewall envoie les logs directement à Splunk en UDP 514
+4. **Indexation** : Splunk reçoit sur UDP 514 et indexe (sourcetype=syslog)
+5. **Visualisation** : L'utilisateur consulte les logs et le dashboard UFW sur http://localhost:8000
 
 ## 🔧 Technologies utilisées
 

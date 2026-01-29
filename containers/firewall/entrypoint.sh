@@ -34,12 +34,12 @@ if ! ps -p $RSYSLOG_PID > /dev/null 2>&1; then
 fi
 echo "✅ rsyslog démarré (PID: $RSYSLOG_PID)"
 
-# Tester l'envoi d'un log de test vers le logcollector
-echo "Test d'envoi de log vers logcollector..."
-if logger -n logcollector -P 514 -d "Firewall démarré - rsyslog opérationnel" 2>/dev/null; then
+# Tester l'envoi d'un log de test vers Splunk (UDP 514)
+echo "Test d'envoi de log vers Splunk..."
+if logger -n splunk -P 514 -d "Firewall démarré - rsyslog opérationnel" 2>/dev/null; then
     echo "✅ Test d'envoi de log réussi"
 else
-    echo "⚠️  Impossible d'envoyer un log de test (normal si logcollector n'est pas encore prêt)"
+    echo "⚠️  Impossible d'envoyer un log de test (normal si Splunk n'est pas encore prêt)"
 fi
 
 # Configurer UFW
@@ -84,20 +84,20 @@ else
     echo "ℹ️  Aucun log UFW pour le moment (normal si aucun trafic n'a été généré)"
 fi
 
-# Vérifier que rsyslog peut envoyer des logs
-echo "Test d'envoi de log vers logcollector..."
-if logger -n logcollector -P 514 -d "Firewall démarré - $(date)" 2>/dev/null; then
-    echo "✅ Test d'envoi de log vers logcollector réussi"
+# Vérifier que rsyslog peut envoyer des logs vers Splunk
+echo "Test d'envoi de log vers Splunk..."
+if logger -n splunk -P 514 -d "Firewall démarré - $(date)" 2>/dev/null; then
+    echo "✅ Test d'envoi de log vers Splunk réussi"
 else
-    echo "⚠️  Impossible d'envoyer un log de test (normal si logcollector n'est pas encore prêt)"
+    echo "⚠️  Impossible d'envoyer un log de test (normal si Splunk n'est pas encore prêt)"
 fi
 
-# Vérifier la connectivité avec logcollector
-echo "Vérification de la connectivité avec logcollector..."
-if ping -c 1 logcollector > /dev/null 2>&1; then
-    echo "✅ Connectivité avec logcollector OK"
+# Vérifier la connectivité avec Splunk
+echo "Vérification de la connectivité avec Splunk..."
+if ping -c 1 splunk > /dev/null 2>&1; then
+    echo "✅ Connectivité avec Splunk OK"
 else
-    echo "⚠️  Impossible de joindre logcollector (vérifiez le réseau)"
+    echo "⚠️  Impossible de joindre Splunk (vérifiez le réseau logs_network)"
 fi
 
 # Garder le conteneur actif et surveiller rsyslog
