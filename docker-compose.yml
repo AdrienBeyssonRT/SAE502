@@ -36,8 +36,11 @@ services:
       - firewall_logs:/var/log/firewall
     restart: unless-stopped
 
+  # Splunk : image personnalisée avec inputs.conf, props.conf et tableau de bord UFW
   splunk:
-    image: splunk/splunk:latest
+    build:
+      context: ./containers/splunk
+      dockerfile: Dockerfile
     container_name: splunk
     hostname: splunk
     environment:
@@ -45,6 +48,7 @@ services:
       - SPLUNK_GENERAL_TERMS=--accept-sgt-current-at-splunk-com
       - SPLUNK_PASSWORD=splunk1RT3
       - SPLUNK_HOME=/opt/splunk
+      - SPLUNK_OPTIMISTIC_ABOUT_FILE_LOCKING=true
     ports:
       - "8000:8000"
       - "9997:9997"
@@ -53,12 +57,11 @@ services:
       - logs_network
     volumes:
       - splunk_data:/opt/splunk/var
-      - ./containers/splunk/inputs.conf:/opt/splunk/etc/system/local/inputs.conf:ro
-      - ./containers/splunk/props.conf:/opt/splunk/etc/system/local/props.conf:ro
-      - ./containers/splunk/dashboard_ufw.xml:/opt/splunk/etc/apps/search/local/data/ui/views/ufw_firewall_dashboard.xml:ro
     restart: unless-stopped
     depends_on:
       - logcollector
+    healthcheck:
+      disable: true
 
   client:
     build:

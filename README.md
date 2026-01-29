@@ -52,7 +52,7 @@ Ce script installe les dépendances si besoin, puis lance le déploiement.
 - **URL** : `http://localhost:8000`
 - **Identifiants** : `admin` / `splunk1RT3`
 
-Le dashboard UFW est provisionné via `containers/splunk/dashboard_ufw.xml`.
+L’image Splunk est construite avec la config (réception UDP 514, parsing UFW) et le **tableau de bord UFW** intégrés (`containers/splunk/Dockerfile`). Recherche : `index=main sourcetype=syslog UFW` ; dashboard : Recherche > Dashboards > UFW Firewall Dashboard.
 
 ## Tests (après déploiement)
 
