@@ -15,7 +15,8 @@ docker cp "$SCRIPT_DIR/inputs.conf" "$CONTAINER:/opt/splunk/etc/system/local/inp
 docker cp "$SCRIPT_DIR/props.conf" "$CONTAINER:/opt/splunk/etc/system/local/props.conf"
 docker cp "$SCRIPT_DIR/dashboard_ufw.xml" "$CONTAINER:/opt/splunk/etc/apps/search/local/data/ui/views/ufw_firewall_dashboard.xml"
 
-docker exec "$CONTAINER" chown -R splunk:splunk /opt/splunk/etc/system/local /opt/splunk/etc/apps/search/local
+docker exec "$CONTAINER" chown -R splunk:splunk /opt/splunk/etc/system/local /opt/splunk/etc/apps/search/local 2>/dev/null || \
+docker exec "$CONTAINER" chown -R 41812:41812 /opt/splunk/etc/system/local /opt/splunk/etc/apps/search/local 2>/dev/null || true
 
 echo "Redémarrage de Splunk pour appliquer la config..."
 docker restart "$CONTAINER"
