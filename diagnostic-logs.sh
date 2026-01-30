@@ -91,9 +91,9 @@ echo ""
 echo "3. Le firewall peut joindre Splunk ?"
 echo "----------------------------------------"
 if docker exec firewall ping -c 1 splunk 2>/dev/null; then
-  echo "   OK (réseau logs_network opérationnel)"
+  echo "   OK (réseau main_network opérationnel)"
 else
-  echo "   ÉCHEC (vérifier que firewall et splunk sont sur logs_network)"
+  echo "   ÉCHEC (vérifier que firewall et splunk sont sur main_network)"
 fi
 echo ""
 
@@ -124,7 +124,7 @@ echo "• Si 1/1b/1d vides : lancer : ./diagnostic-logs.sh --generate-traffic  (
 echo "• Si 1c manquant : sudo cp ansible/files/99-splunk-ufw.conf /etc/rsyslog.d/ && sudo systemctl restart rsyslog"
 echo "• Si 1b et 1d vides : logs noyau du conteneur non visibles sur l'hôte (limitation noyau/Docker) ; seuls les vrais logs UFW apparaîtront dans Splunk si visibles"
 echo "• Si 2 échoue   : redémarrer le firewall : docker compose restart firewall"
-echo "• Si 3 échoue   : vérifier docker compose (firewall + splunk sur logs_network)"
+echo "• Si 3 échoue   : vérifier docker compose (firewall + splunk sur main_network)"
 echo "• Si 4 est vide : reconstruire l'image Splunk : docker compose build splunk && docker compose up -d splunk"
 echo "• Si 5 est vide : après avoir fait 1, attendre 30 s puis relancer ce diagnostic"
 echo ""

@@ -89,13 +89,10 @@ Chaque conteneur contient :
    - Génère du trafic et vérifie les logs
    - Vérifie l'intégration avec Splunk
 
-## Réseaux Docker
+## Réseau Docker
 
-Définis dans `docker-compose.yml` :
-- `firewall_network` (172.20.0.0/16) : Réseau pour le firewall et le client
-- `logs_network` (172.21.0.0/16) : Réseau pour le firewall et Splunk (envoi direct des logs)
-- `supervision_network` (172.22.0.0/16) : Réseau Splunk
-- `tests_network` (172.23.0.0/16) : Réseau pour les tests
+Défini dans `docker-compose.yml` :
+- `main_network` (172.20.0.0/16) : tous les conteneurs (firewall, splunk, client, attacker) sont sur ce réseau pour que le trafic circule et que les logs remontent à Splunk.
 
 ## Points d'entrée
 

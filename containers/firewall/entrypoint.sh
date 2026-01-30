@@ -97,7 +97,7 @@ echo "Vérification de la connectivité avec Splunk..."
 if ping -c 1 splunk > /dev/null 2>&1; then
     echo "✅ Connectivité avec Splunk OK"
 else
-    echo "⚠️  Impossible de joindre Splunk (vérifiez le réseau logs_network)"
+    echo "⚠️  Impossible de joindre Splunk (vérifiez le réseau main_network)"
 fi
 
 # Garder le conteneur actif et surveiller rsyslog

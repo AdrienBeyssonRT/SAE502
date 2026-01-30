@@ -18,15 +18,12 @@ L’objectif final est de **visualiser dans Splunk** les événements UFW (BLOCK
 |---|---|
 | `firewall` | UFW + envoi des logs kernel vers Splunk (UDP 514) |
 | `splunk` | réception syslog UDP 514 + indexation + dashboard |
-| `client` | tests internes (réseau `firewall_network`) |
-| `attacker` | tests externes (réseau `tests_network`) |
+| `client` | tests internes |
+| `attacker` | tests externes (trafic bloqué par UFW) |
 
-### Réseaux Docker
+### Réseau Docker
 
-- `firewall_network` : `firewall` ↔ `client`
-- `logs_network` : `firewall` ↔ `splunk`
-- `supervision_network` : `splunk`
-- `tests_network` : `client` / `attacker`
+- **Un seul réseau** `main_network` (172.20.0.0/16) : tous les conteneurs (`firewall`, `splunk`, `client`, `attacker`) sont dessus. Le trafic peut circuler, UFW génère les logs, et le firewall envoie les logs à Splunk en UDP 514.
 
 ## Prérequis
 

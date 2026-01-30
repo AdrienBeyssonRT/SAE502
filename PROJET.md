@@ -14,11 +14,7 @@ Automatiser le déploiement complet d'un pare-feu Linux (UFW), centraliser ses j
   - `client` : Conteneur de test avec outils réseau
   - `attacker` : Conteneur pour générer du trafic bloqué
 
-- ✅ **4 réseaux Docker distincts** :
-  - `firewall_network` (172.20.0.0/16)
-  - `logs_network` (172.21.0.0/16)
-  - `supervision_network` (172.22.0.0/16)
-  - `tests_network` (172.23.0.0/16)
+- ✅ **1 réseau Docker** : `main_network` (172.20.0.0/16) — tous les conteneurs (firewall, splunk, client, attacker) sont dessus pour que le trafic et les logs fonctionnent.
 
 ### Services fonctionnels
 
@@ -78,7 +74,7 @@ Automatiser le déploiement complet d'un pare-feu Linux (UFW), centraliser ses j
 │  │ (tests)  │    │ (trafic)  │                          │
 │  └──────────┘    └──────────┘                          │
 │                                                         │
-│  Réseaux: firewall_network, logs_network, tests_network │
+│  Réseau: main_network (tous les conteneurs)             │
 └─────────────────────────────────────────────────────────┘
 ```
 

@@ -6,13 +6,14 @@
 UFW (kern.log) → rsyslog (firewall) --UDP 514--> Splunk (index main, sourcetype syslog)
 ```
 
-- **Firewall** : `containers/firewall/rsyslog.conf` envoie `kern.*` et `kernel-ufw:*` vers **@@splunk:514** (UDP).
+- **Firewall** : `containers/firewall/rsyslog.conf` envoie `kern.*` vers **@splunk:514** (UDP).
 - **Splunk** : `containers/splunk/inputs.conf` écoute sur **UDP 514** (`[udp://514]`, `listen_on_ip = 0.0.0.0`).
 
-## Réseaux Docker
+## Réseau Docker
 
-- **firewall** et **splunk** sont sur **logs_network** → le nom `splunk` est résolu.
-- Le logcollector a été retiré : envoi direct firewall → Splunk.
+- **Un seul réseau** `main_network` (172.20.0.0/16) : **firewall**, **splunk**, **client**, **attacker** sont tous dessus.
+- Le nom `splunk` est résolu sur ce réseau → le firewall envoie les logs en UDP 514 à Splunk.
+- Envoi direct firewall → Splunk (pas de logcollector).
 
 ## Après modification des configs
 

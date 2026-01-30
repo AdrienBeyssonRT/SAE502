@@ -78,19 +78,16 @@ ansible-playbook ansible/playbooks/deploy-and-test.yml
 
 ### Conteneurs Docker
 
-| Conteneur | Rôle | Réseaux | Ports |
-|-----------|------|---------|-------|
-| **firewall** | Pare-feu UFW | firewall_network, logs_network | - |
-| **splunk** | Plateforme de supervision Splunk | supervision_network, logs_network | 8000, 514/udp |
-| **client** | Conteneur de test | firewall_network, tests_network | - |
-| **attacker** | Conteneur de test (trafic bloqué) | tests_network | - |
+| Conteneur | Rôle | Réseau | Ports |
+|-----------|------|--------|-------|
+| **firewall** | Pare-feu UFW | main_network | - |
+| **splunk** | Plateforme de supervision Splunk | main_network | 8000, 514/udp |
+| **client** | Conteneur de test | main_network | - |
+| **attacker** | Conteneur de test (trafic bloqué) | main_network | - |
 
-### Réseaux Docker
+### Réseau Docker
 
-- `firewall_network` (172.20.0.0/16) : Réseau pour firewall et client
-- `logs_network` (172.21.0.0/16) : Réseau pour firewall et Splunk (envoi direct des logs)
-- `supervision_network` (172.22.0.0/16) : Réseau Splunk
-- `tests_network` (172.23.0.0/16) : Réseau pour les tests
+- `main_network` (172.20.0.0/16) : tous les conteneurs sont dessus (firewall, splunk, client, attacker) pour que le trafic et les logs fonctionnent.
 
 ## 🔄 Flux des logs
 

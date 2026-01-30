@@ -8,8 +8,7 @@ services:
     container_name: firewall
     hostname: firewall
     networks:
-      - firewall_network
-      - logs_network
+      - main_network
     cap_add:
       - NET_ADMIN
       - NET_RAW
@@ -44,8 +43,7 @@ services:
       - "9997:9997"
       - "514:514/udp"
     networks:
-      - supervision_network
-      - logs_network
+      - main_network
     volumes:
       - splunk_data:/opt/splunk/var
     restart: unless-stopped
@@ -59,13 +57,11 @@ services:
     container_name: client
     hostname: client
     networks:
-      - firewall_network
-      - tests_network
+      - main_network
     tty: true
     stdin_open: true
     restart: unless-stopped
 
-  # Conteneur externe pour générer du trafic bloqué
   attacker:
     build:
       context: ./containers/client
@@ -73,37 +69,18 @@ services:
     container_name: attacker
     hostname: attacker
     networks:
-      - tests_network
+      - main_network
     tty: true
     stdin_open: true
     restart: unless-stopped
 
 networks:
-  firewall_network:
+  main_network:
     driver: bridge
     ipam:
       config:
         - subnet: 172.20.0.0/16
-  logs_network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.21.0.0/16
-  supervision_network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.22.0.0/16
-  tests_network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.23.0.0/16
 
 volumes:
   splunk_data:
     driver: local
-
-
-
-

@@ -94,28 +94,34 @@
       failed_when: false
 
     # ==========================================
-    # ÉTAPE 4 : RSYSLOG HÔTE → SPLUNK (logs noyau UFW)
+    # ÉTAPE 4 : RSYSLOG HÔTE (optionnel, ignoré si sudo non disponible)
     # ==========================================
-    # Les logs UFW du conteneur firewall sont émis par le noyau de l'hôte.
-    # On configure l'hôte pour envoyer kern.* à Splunk (port 514 exposé).
-    - name: S'assurer que rsyslog est installé sur l'hôte
-      ansible.builtin.apt:
-        name: rsyslog
-        state: present
-      become: true
+    # Les logs UFW sont gérés DANS le conteneur firewall (rsyslog → Splunk).
+    # La config rsyslog sur l'hôte n'est pas nécessaire pour que les logs remontent.
+    - name: "(Optionnel) Config rsyslog sur l'hôte pour envoi kern.* vers Splunk"
+      block:
+        - name: S'assurer que rsyslog est installé sur l'hôte
+          ansible.builtin.apt:
+            name: rsyslog
+            state: present
+          become: true
 
-    - name: Copier la config rsyslog pour envoi kern.* vers Splunk
-      ansible.builtin.copy:
-        src: "{{ project_root }}/ansible/files/99-splunk-ufw.conf"
-        dest: /etc/rsyslog.d/99-splunk-ufw.conf
-        mode: "0644"
-      become: true
+        - name: Copier la config rsyslog pour envoi kern.* vers Splunk
+          ansible.builtin.copy:
+            src: "{{ project_root }}/ansible/files/99-splunk-ufw.conf"
+            dest: /etc/rsyslog.d/99-splunk-ufw.conf
+            mode: "0644"
+          become: true
 
-    - name: Redémarrer rsyslog sur l'hôte
-      ansible.builtin.service:
-        name: rsyslog
-        state: restarted
-      become: true
+        - name: Redémarrer rsyslog sur l'hôte
+          ansible.builtin.service:
+            name: rsyslog
+            state: restarted
+          become: true
+      rescue:
+        - name: Ignorer l'échec rsyslog hôte (les logs viennent du conteneur firewall)
+          ansible.builtin.debug:
+            msg: "Config rsyslog sur l'hôte ignorée (sudo requis). Les logs UFW viennent du conteneur firewall → Splunk."
 
     # ==========================================
     # RÉSUMÉ FINAL
