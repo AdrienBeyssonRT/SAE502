@@ -11,7 +11,7 @@ UFW (kern.log) → rsyslog (firewall) --UDP 514--> Splunk (index main, sourcetyp
 
 ## Réseau Docker
 
-- **Un seul réseau** `main_network` (172.20.0.0/16) : **firewall**, **splunk**, **client**, **attacker** sont tous dessus.
+- **Un seul réseau** `main_network` (10.20.0.0/16) : **firewall**, **splunk**, **client**, **attacker** sont tous dessus.
 - Le nom `splunk` est résolu sur ce réseau → le firewall envoie les logs en UDP 514 à Splunk.
 - Envoi direct firewall → Splunk (pas de logcollector).
 

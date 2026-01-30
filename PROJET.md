@@ -14,7 +14,7 @@ Automatiser le déploiement complet d'un pare-feu Linux (UFW), centraliser ses j
   - `client` : Conteneur de test avec outils réseau
   - `attacker` : Conteneur pour générer du trafic bloqué
 
-- ✅ **1 réseau Docker** : `main_network` (172.20.0.0/16) — tous les conteneurs (firewall, splunk, client, attacker) sont dessus pour que le trafic et les logs fonctionnent.
+- ✅ **1 réseau Docker** : `main_network` (10.20.0.0/16) — tous les conteneurs (firewall, splunk, client, attacker) sont dessus pour que le trafic et les logs fonctionnent.
 
 ### Services fonctionnels
 
@@ -25,7 +25,7 @@ Automatiser le déploiement complet d'un pare-feu Linux (UFW), centraliser ses j
 ### Règles UFW implémentées
 
 - ✅ `deny incoming`, `allow outgoing`, `deny routed`
-- ✅ SSH interne : `allow from 172.20.0.0/16 to any port 22`
+- ✅ SSH interne : `allow from 10.20.0.0/16 to any port 22`
 - ✅ Envoi logs : `allow out 514/udp`
 - ✅ DNS sortant : `allow out 53`
 - ✅ Web sortant : `allow out 80/tcp et 443/tcp`
@@ -145,7 +145,7 @@ Automatiser le déploiement complet d'un pare-feu Linux (UFW), centraliser ses j
 
 ### Scénario 2 : Test d'autorisation
 1. Client tente une connexion SSH depuis le réseau interne
-2. UFW autorise (règle allow from 172.20.0.0/16)
+2. UFW autorise (règle allow from 10.20.0.0/16)
 3. Log généré avec action `[UFW ALLOW]`
 4. Log visible dans la supervision
 

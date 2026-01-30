@@ -92,7 +92,7 @@ Chaque conteneur contient :
 ## Réseau Docker
 
 Défini dans `docker-compose.yml` :
-- `main_network` (172.20.0.0/16) : tous les conteneurs (firewall, splunk, client, attacker) sont sur ce réseau pour que le trafic circule et que les logs remontent à Splunk.
+- `main_network` (10.20.0.0/16) : tous les conteneurs (firewall, splunk, client, attacker) sont sur ce réseau pour que le trafic circule et que les logs remontent à Splunk.
 
 ## Points d'entrée
 

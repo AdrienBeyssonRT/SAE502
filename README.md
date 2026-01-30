@@ -23,7 +23,7 @@ L’objectif final est de **visualiser dans Splunk** les événements UFW (BLOCK
 
 ### Réseau Docker
 
-- **Un seul réseau** `main_network` (172.20.0.0/16) : tous les conteneurs (`firewall`, `splunk`, `client`, `attacker`) sont dessus. Le trafic peut circuler, UFW génère les logs, et le firewall envoie les logs à Splunk en UDP 514.
+- **Un seul réseau** `main_network` (10.20.0.0/16) : tous les conteneurs (`firewall`, `splunk`, `client`, `attacker`) sont dessus. Le trafic peut circuler, UFW génère les logs, et le firewall envoie les logs à Splunk en UDP 514.
 
 ## Prérequis
 

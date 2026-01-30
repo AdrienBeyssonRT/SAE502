@@ -87,7 +87,7 @@ ansible-playbook ansible/playbooks/deploy-and-test.yml
 
 ### Réseau Docker
 
-- `main_network` (172.20.0.0/16) : tous les conteneurs sont dessus (firewall, splunk, client, attacker) pour que le trafic et les logs fonctionnent.
+- `main_network` (10.20.0.0/16) : tous les conteneurs sont dessus (firewall, splunk, client, attacker) pour que le trafic et les logs fonctionnent.
 
 ## 🔄 Flux des logs
 
@@ -111,7 +111,7 @@ ansible-playbook ansible/playbooks/deploy-and-test.yml
 - `deny routed` : Blocage du routage non autorisé
 
 ### Services autorisés
-- **SSH interne** : `allow from 172.20.0.0/16 to any port 22`
+- **SSH interne** : `allow from 10.20.0.0/16 to any port 22`
 - **Envoi des logs** : `allow out 514/udp` (vers Splunk)
 - **DNS sortant** : `allow out 53/udp` et `53/tcp`
 - **Web sortant** : `allow out 80/tcp` et `443/tcp`
