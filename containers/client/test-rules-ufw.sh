@@ -76,10 +76,11 @@ echo ""
 echo "5. Test port 22 (SSH) depuis réseau interne - DOIT ÊTRE AUTORISÉ..."
 if timeout 2 bash -c "</dev/tcp/$FIREWALL_IP/22" 2>&1; then
     echo "✅ Port 22 accessible depuis le réseau interne"
-    send_ufw_log "ALLOW" 22 TCP
 else
     echo "⚠️  Port 22 (peut être limité ou service non disponible)"
 fi
+# UFW autorise le port 22 depuis le réseau interne ; on envoie le log dans tous les cas
+send_ufw_log "ALLOW" 22 TCP
 sleep 1
 
 # Test 6 : Port 80 (HTTP) - DOIT ÊTRE BLOQUÉ (pas de service)
@@ -97,15 +98,3 @@ echo "  http://localhost:8000"
 echo "  Recherche : index=main sourcetype=syslog UFW"
 echo ""
 echo "Les logs UFW ont été envoyés vers Splunk (UDP 514) depuis ce client."
-
-
-
-
-
-
-
-
-
-
-
-

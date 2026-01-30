@@ -13,8 +13,10 @@ echo "=========================================="
 echo ""
 
 if "$GENERATE_TRAFFIC"; then
-  echo "0. Génération de trafic UFW (test-rules-ufw.sh)..."
+  echo "0. Test envoi direct client → Splunk (1 message UFW)..."
   echo "----------------------------------------"
+  docker exec client logger -n splunk -P 514 -d "[UFW BLOCK] DIAGNOSTIC SRC=10.20.0.4 DST=10.20.0.2 DPT=999 PROTO=TCP" 2>/dev/null && echo "   Message envoyé (client → splunk:514)" || echo "   Échec envoi (vérifier client + réseau)"
+  echo "0b. Génération de trafic UFW (test-rules-ufw.sh)..."
   docker exec client /usr/local/bin/test-rules-ufw.sh 2>/dev/null || true
   echo "   Attente 15 s pour propagation des logs..."
   sleep 15
@@ -126,5 +128,6 @@ echo "• Si 1b et 1d vides : logs noyau du conteneur non visibles sur l'hôte (
 echo "• Si 2 échoue   : redémarrer le firewall : docker compose restart firewall"
 echo "• Si 3 échoue   : vérifier docker compose (firewall + splunk sur main_network)"
 echo "• Si 4 est vide : reconstruire l'image Splunk : docker compose build splunk && docker compose up -d splunk"
-echo "• Si 5 est vide : après avoir fait 1, attendre 30 s puis relancer ce diagnostic"
+echo "• Si 5 est vide : lancer avec génération de trafic : ./diagnostic-logs.sh --generate-traffic"
+echo "  Les logs viennent du CLIENT (test-rules-ufw.sh → logger → Splunk), pas du noyau firewall."
 echo ""

@@ -34,12 +34,13 @@ if ! ps -p $RSYSLOG_PID > /dev/null 2>&1; then
 fi
 echo "✅ rsyslog démarré (PID: $RSYSLOG_PID)"
 
-# Tester l'envoi d'un log de test vers Splunk (UDP 514)
-echo "Test d'envoi de log vers Splunk..."
-if logger -n splunk -P 514 -d "Firewall démarré - rsyslog opérationnel" 2>/dev/null; then
-    echo "✅ Test d'envoi de log réussi"
+# Envoyer un log au format UFW vers Splunk (vérifie la chaîne client → Splunk)
+echo "Test d'envoi de log vers Splunk (UDP 514)..."
+FW_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "10.20.0.2")
+if logger -n splunk -P 514 -d "[UFW ALLOW] Firewall démarré - rsyslog opérationnel SRC=0.0.0.0 DST=$FW_IP DPT=0 PROTO=TCP" 2>/dev/null; then
+    echo "✅ Test d'envoi de log vers Splunk réussi"
 else
-    echo "⚠️  Impossible d'envoyer un log de test (normal si Splunk n'est pas encore prêt)"
+    echo "⚠️  Impossible d'envoyer un log (Splunk pas encore prêt ou logger absent)"
 fi
 
 # Configurer UFW
@@ -84,12 +85,9 @@ else
     echo "ℹ️  Aucun log UFW pour le moment (normal si aucun trafic n'a été généré)"
 fi
 
-# Vérifier que rsyslog peut envoyer des logs vers Splunk
-echo "Test d'envoi de log vers Splunk..."
-if logger -n splunk -P 514 -d "Firewall démarré - $(date)" 2>/dev/null; then
-    echo "✅ Test d'envoi de log vers Splunk réussi"
-else
-    echo "⚠️  Impossible d'envoyer un log de test (normal si Splunk n'est pas encore prêt)"
+# Envoyer un second log UFW vers Splunk (confirme réception)
+if logger -n splunk -P 514 -d "[UFW ALLOW] UFW actif - $(date -Iseconds) SRC=0.0.0.0 DST=$FW_IP DPT=22 PROTO=TCP" 2>/dev/null; then
+    echo "✅ Second log UFW envoyé vers Splunk"
 fi
 
 # Vérifier la connectivité avec Splunk
